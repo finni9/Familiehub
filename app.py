@@ -7,6 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 DATA_FIL = "familie_data.json"
+TIDSSONE_NORGE = ZoneInfo("Europe/Oslo")
 
 STANDARD_MIDDAGER = {
     "Taco": ["Kjøttdeig", "Tacokrydder", "Tortillalefser", "Rømme", "Ost", "Salsa", "Mais", "Agurk"],
@@ -87,12 +88,15 @@ def migrer_handleliste(gammel_liste):
     return ny_liste
 
 def last_data():
+    idag_str = datetime.now(TIDSSONE_NORGE).strftime("%Y-%m-%d")
     if os.path.exists(DATA_FIL):
         try:
             with open(DATA_FIL, "r", encoding="utf-8") as f:
                 d = json.load(f)
                 if "pin" not in d:
                     d["pin"] = "1234"
+                if "sist_nullstilt" not in d:
+                    d["sist_nullstilt"] = idag_str
                 if "medlemmer" not in d:
                     d["medlemmer"] = ["Far", "Mor", "Barn 1", "Barn 2"]
                 if "stjerne_brukere" not in d:
@@ -131,6 +135,7 @@ def last_data():
 
     return {
         "pin": "1234",
+        "sist_nullstilt": idag_str,
         "medlemmer": ["Far", "Mor", "Barn 1", "Barn 2"],
         "stjerne_brukere": ["Barn 1", "Barn 2", "Far", "Mor"],
         "poeng": {"Far": 0, "Mor": 0, "Barn 1": 0, "Barn 2": 0},
@@ -158,6 +163,16 @@ def lagre_data(data):
 
 data = last_data()
 
+# AUTOMATISK NULLSTILLING VED MIDNATT (NORSK TID)
+idag_str = datetime.now(TIDSSONE_NORGE).strftime("%Y-%m-%d")
+if data.get("sist_nullstilt") != idag_str:
+    for o in data["oppgaver"]:
+        if o.get("gjentakende", False):
+            o["ferdig"] = False
+            o["fullfort_av"] = None
+    data["sist_nullstilt"] = idag_str
+    lagre_data(data)
+
 def legg_til_vare_i_data(varenavn, kategori=None):
     if not varenavn.strip():
         return False
@@ -175,7 +190,6 @@ def legg_til_vare_i_data(varenavn, kategori=None):
     })
     return True
 
-# Callbacks
 def cb_sett_middag(dag, rett):
     data["middagsplan"][dag]["rett"] = rett
     lagre_data(data)
@@ -246,8 +260,7 @@ with st.sidebar:
                 st.error("Feil PIN-kode!")
 
 # ----------------- MOBILVENNLIG TOPPSTRIPE -----------------
-tidssone_norge = ZoneInfo("Europe/Oslo")
-naa = datetime.now(tidssone_norge)
+naa = datetime.now(TIDSSONE_NORGE)
 dag_indeks = naa.weekday()
 idag_navn = DAGER[dag_indeks]
 dato_tekst = f"{idag_navn} {naa.day}. {MAANEDER[naa.month - 1]}"
@@ -337,7 +350,7 @@ with fane_oppgaver:
 
     c_dag, c_uke = st.columns(2)
     with c_dag:
-        if st.button("☀️ Ny dag (Nullstill)", use_container_width=True):
+        if st.button("☀️ Nullstill nå (Manuell)", use_container_width=True):
             for o in data["oppgaver"]:
                 if o.get("gjentakende", False):
                     o["ferdig"] = False
@@ -625,7 +638,7 @@ with fane_middag:
                     lagre_data(data)
                     st.rerun()
 
-# ----------------- FANE 4: HANDLELISTE (KUN AVKRYSSING, INGEN EKSTRA SLETTEKNAPP) -----------------
+# ----------------- FANE 4: HANDLELISTE -----------------
 with fane_handleliste:
     st.subheader("🛒 Handleliste")
 
