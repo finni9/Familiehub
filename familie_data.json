@@ -1,0 +1,369 @@
+{
+  "poeng": {
+    "Ellen kaspara": 5,
+    "Far Finn Håkon": 3,
+    "Mor Kristin": 4,
+    "Jenny Oline": 4
+  },
+  "oppgaver": [
+    {
+      "id": "bc2c1ba4-fe43-4ae4-862b-c0aa81a28be5",
+      "tekst": "Rydde rommet",
+      "hvem": "Ellen kaspara",
+      "ferdig": false,
+      "stjerner": 2,
+      "fullfort_av": null,
+      "gjentakende": false
+    },
+    {
+      "id": "ce6913ae-7f61-48d4-8346-63e9dfc65d57",
+      "tekst": "deke middags bord",
+      "hvem": "Ellen kaspara",
+      "ferdig": false,
+      "stjerner": 2,
+      "fullfort_av": null,
+      "gjentakende": false
+    },
+    {
+      "id": "987b13a4-2304-478d-ac17-b5254322c8cf",
+      "tekst": "pusse tenner",
+      "hvem": "Ellen kaspara",
+      "ferdig": true,
+      "stjerner": 1,
+      "fullfort_av": null,
+      "gjentakende": true
+    },
+    {
+      "id": "870a3ff9-9d67-4093-863b-1ea6215c2e73",
+      "tekst": "pusse tenner",
+      "hvem": "Jenny Oline",
+      "ferdig": false,
+      "stjerner": 1,
+      "fullfort_av": null,
+      "gjentakende": true
+    },
+    {
+      "id": "77c8983d-a860-4bfb-9a89-101774145b2e",
+      "tekst": "lese bok",
+      "hvem": "Mor Kristin",
+      "ferdig": false,
+      "stjerner": 1,
+      "fullfort_av": null,
+      "gjentakende": false
+    },
+    {
+      "id": "ac68d9ad-ecaf-4171-887f-8cdbd3c39e93",
+      "tekst": "sjifte til vinter dekk",
+      "hvem": "Far Finn Håkon",
+      "ferdig": false,
+      "stjerner": 1,
+      "fullfort_av": null,
+      "gjentakende": false
+    },
+    {
+      "id": "1e0d1019-38df-47ca-96bf-c8dfd01edbf0",
+      "tekst": "rydd rom",
+      "hvem": "Ellen kaspara",
+      "ferdig": false,
+      "stjerner": 2,
+      "fullfort_av": null,
+      "gjentakende": true
+    },
+    {
+      "id": "8110806a-6890-45ce-a0f1-11235c59396f",
+      "tekst": "rydd rom",
+      "hvem": "Jenny Oline",
+      "ferdig": false,
+      "stjerner": 2,
+      "fullfort_av": null,
+      "gjentakende": true
+    }
+  ],
+  "middager": {
+    "Mandag": "taco ",
+    "Tirsdag": "",
+    "Onsdag": "",
+    "Torsdag": "",
+    "Fredag": "",
+    "Lørdag": "",
+    "Søndag": ""
+  },
+  "handleliste": [
+    {
+      "id": "340ba091-3570-4554-83af-1761ad9223b0",
+      "navn": "Spagetti",
+      "kategori": "🍞 Tørrvare, Krydder & Kolonial"
+    },
+    {
+      "id": "1a0df086-d845-4ef1-a3ec-2f80cdffb5e5",
+      "navn": "Kjøttdeig",
+      "kategori": "🥩 Kjøtt, Fisk & Fjærkre"
+    },
+    {
+      "id": "74d293cc-f906-4612-aa52-25dd807972b6",
+      "navn": "Hakkede tomater",
+      "kategori": "🥦 Frukt & Grønt"
+    },
+    {
+      "id": "0a837e96-a23d-44a5-aed0-fd527756b69d",
+      "navn": "Løk",
+      "kategori": "🥦 Frukt & Grønt"
+    },
+    {
+      "id": "fbb8c2e4-531d-469a-abf9-95f47b4f9082",
+      "navn": "Hvitløk",
+      "kategori": "🥦 Frukt & Grønt"
+    },
+    {
+      "id": "300f1c4e-6771-4ca5-b2c0-80dbfda5e78d",
+      "navn": "Parmesan",
+      "kategori": "🧀 Meieri & Kjølevare"
+    },
+    {
+      "id": "3bf44399-409b-4cb3-9215-a85260d97bf3",
+      "navn": "Toro Tomatsuppe",
+      "kategori": "🥦 Frukt & Grønt"
+    },
+    {
+      "id": "efd756e6-d137-4000-98e8-af6e3c6a6bff",
+      "navn": "Kyllingfilet",
+      "kategori": "🥩 Kjøtt, Fisk & Fjærkre"
+    },
+    {
+      "id": "d22be6c6-f4c7-466e-a32a-aab3934b114a",
+      "navn": "Wokgrønnsaker",
+      "kategori": "📦 Annet / Diverse"
+    },
+    {
+      "id": "00a635e5-67be-460e-a0b2-02d5406c04df",
+      "navn": "Woksaus",
+      "kategori": "🍞 Tørrvare, Krydder & Kolonial"
+    },
+    {
+      "id": "a2f21071-5dc7-4580-97ff-c658f2bfa552",
+      "navn": "Ris eller nudler",
+      "kategori": "🍞 Tørrvare, Krydder & Kolonial"
+    },
+    {
+      "id": "28c54543-eb18-4317-8e84-4abcff481796",
+      "navn": "Kjøttpølser",
+      "kategori": "🥩 Kjøtt, Fisk & Fjærkre"
+    },
+    {
+      "id": "851cc98c-7ebf-4ef2-8d76-7bab7e0dbc53",
+      "navn": "Makaroni",
+      "kategori": "🍞 Tørrvare, Krydder & Kolonial"
+    },
+    {
+      "id": "f3675d96-fef7-4990-a977-22307b633142",
+      "navn": "Hvit saus",
+      "kategori": "🍞 Tørrvare, Krydder & Kolonial"
+    },
+    {
+      "id": "c2878a5d-d63a-46a8-85a2-9aa95a7052e4",
+      "navn": "Ost",
+      "kategori": "🧀 Meieri & Kjølevare"
+    },
+    {
+      "id": "cebe8a5e-8b2d-4e5c-bedf-8ae54493813e",
+      "navn": "Brokkoli",
+      "kategori": "🥦 Frukt & Grønt"
+    },
+    {
+      "id": "8dcb612d-7f63-4a2a-b8b1-7fa3d2f27cc3",
+      "navn": "Kjøttkaker",
+      "kategori": "🥩 Kjøtt, Fisk & Fjærkre"
+    },
+    {
+      "id": "4f67d40b-1598-45ec-9541-1f6ee4562262",
+      "navn": "Brun saus",
+      "kategori": "🍞 Tørrvare, Krydder & Kolonial"
+    },
+    {
+      "id": "2de03d24-9fde-45d8-8979-6bd5abfc1168",
+      "navn": "Poteter",
+      "kategori": "🥦 Frukt & Grønt"
+    },
+    {
+      "id": "17ab1cc0-29a9-423d-9fad-c05683425b79",
+      "navn": "Tyttebærsyltetøy",
+      "kategori": "🍞 Tørrvare, Krydder & Kolonial"
+    },
+    {
+      "id": "aae26deb-526c-4057-bbee-472df0c605d9",
+      "navn": "Ertestuing",
+      "kategori": "📦 Annet / Diverse"
+    },
+    {
+      "id": "cf2264df-e17a-40fc-ba99-8c0f59aa4ec6",
+      "navn": "Hvetemel",
+      "kategori": "🍞 Tørrvare, Krydder & Kolonial"
+    },
+    {
+      "id": "a05a2701-6d10-4593-9805-d57558cc5547",
+      "navn": "Egg",
+      "kategori": "🧀 Meieri & Kjølevare"
+    },
+    {
+      "id": "6d662591-b487-4228-9260-10a0f29454cf",
+      "navn": "Melk",
+      "kategori": "🧀 Meieri & Kjølevare"
+    },
+    {
+      "id": "e6209452-3d9d-4f54-b28b-cfb0c05f2977",
+      "navn": "Bacon",
+      "kategori": "🥩 Kjøtt, Fisk & Fjærkre"
+    },
+    {
+      "id": "74005f85-07be-4e1e-a9ca-de51f347887d",
+      "navn": "Blåbærsyltetøy",
+      "kategori": "🍞 Tørrvare, Krydder & Kolonial"
+    }
+  ],
+  "medlemmer": [
+    "Far Finn Håkon",
+    "Mor Kristin",
+    "Ellen kaspara",
+    "Jenny Oline"
+  ],
+  "stjerne_brukere": [
+    "Ellen kaspara",
+    "Mor Kristin",
+    "Far Finn Håkon",
+    "Jenny Oline"
+  ],
+  "belonninger": [
+    {
+      "id": "31dd99e1-dd4d-4b3b-a0ff-28ab69390958",
+      "tittel": "30 min ekstra skjermtid",
+      "pris": 5
+    },
+    {
+      "id": "0d43b707-fde1-4a93-bf88-1033479ea736",
+      "tittel": "Velge lørdagsgodt",
+      "pris": 8
+    },
+    {
+      "id": "82e98a62-52bd-4861-b6f4-657cf187a67e",
+      "tittel": "Bestemme middag / kino",
+      "pris": 15
+    }
+  ],
+  "oppskrifter": {
+    "Taco": [
+      "Kjøttdeig",
+      "Tacokrydder",
+      "Tortillalefser",
+      "Rømme",
+      "Ost",
+      "Salsa",
+      "Mais",
+      "Agurk"
+    ],
+    "Laks med grønnsaker og poteter": [
+      "Laksefilet",
+      "Poteter",
+      "Gulrøtter",
+      "Rømme",
+      "Sitron"
+    ],
+    "Spagetti bolognese": [
+      "Spagetti",
+      "Kjøttdeig",
+      "Hakkede tomater",
+      "Løk",
+      "Hvitløk",
+      "Parmesan"
+    ],
+    "Hjemmelaget pizza": [
+      "Pizzadeig",
+      "Pizzasaus",
+      "Ost",
+      "Skinke",
+      "Champignon"
+    ],
+    "Kyllingwok": [
+      "Kyllingfilet",
+      "Wokgrønnsaker",
+      "Woksaus",
+      "Ris eller nudler"
+    ],
+    "Fiskepinner med potetmos": [
+      "Fiskepinner",
+      "Poteter",
+      "Erter",
+      "Smør",
+      "Melk"
+    ],
+    "Kjøttkaker i brun saus": [
+      "Kjøttkaker",
+      "Brun saus",
+      "Poteter",
+      "Tyttebærsyltetøy",
+      "Ertestuing"
+    ],
+    "Pannekaker med bacon": [
+      "Hvetemel",
+      "Egg",
+      "Melk",
+      "Bacon",
+      "Blåbærsyltetøy"
+    ],
+    "Pølseform / Pølsegrateng": [
+      "Kjøttpølser",
+      "Makaroni",
+      "Hvit saus",
+      "Ost",
+      "Brokkoli"
+    ],
+    "tomatsuppe": [
+      "Toro Tomatsuppe"
+    ]
+  },
+  "middagsplan": {
+    "Mandag": {
+      "rett": "Pannekaker med bacon",
+      "onske": "Far Finn Håkon",
+      "kokk": "Ellen kaspara"
+    },
+    "Tirsdag": {
+      "rett": "Fiskepinner med potetmos",
+      "onske": "Mor Kristin",
+      "kokk": "Ellen kaspara"
+    },
+    "Onsdag": {
+      "rett": "tomatsuppe",
+      "onske": "Far Finn Håkon",
+      "kokk": "Jenny Oline"
+    },
+    "Torsdag": {
+      "rett": "Laks med grønnsaker og poteter",
+      "onske": "Far Finn Håkon",
+      "kokk": "Ingen valgt"
+    },
+    "Fredag": {
+      "rett": "Taco",
+      "onske": "Mor Kristin",
+      "kokk": "Ingen valgt"
+    },
+    "Lørdag": {
+      "rett": "Kjøttkaker i brun saus",
+      "onske": "Ingen",
+      "kokk": "Ingen valgt"
+    },
+    "Søndag": {
+      "rett": "Spagetti bolognese",
+      "onske": "Ingen",
+      "kokk": "Ingen valgt"
+    }
+  },
+  "pin": "1234",
+  "beskjeder": [
+    {
+      "id": "d75a3c6d-58b8-4c9c-87eb-4e6dbe849abf",
+      "tekst": "Husk gymtøy i morgen! 🏃‍♂️",
+      "fra": "Mor",
+      "tid": "Kl. 08:00"
+    }
+  ]
+}
