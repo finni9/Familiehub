@@ -4,6 +4,7 @@ import os
 import random
 import uuid
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 DATA_FIL = "familie_data.json"
 
@@ -243,7 +244,8 @@ with st.sidebar:
                 st.error("Feil PIN-kode!")
 
 # ----------------- DATO & KLOKKESLETT -----------------
-naa = datetime.now()
+tidssone_norge = ZoneInfo("Europe/Oslo")
+naa = datetime.now(tidssone_norge)
 dag_indeks = naa.weekday()
 idag_navn = DAGER[dag_indeks]
 dato_tekst = f"{idag_navn} {naa.day}. {MAANEDER[naa.month - 1]} {naa.year}"
@@ -862,4 +864,3 @@ if er_forelder and fane_familie:
                     st.rerun()
                 else:
                     st.error("Dette navnet finnes allerede.")
-                    
