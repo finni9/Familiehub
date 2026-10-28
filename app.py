@@ -3,22 +3,52 @@ import json
 import os
 import random
 import uuid
-from datetime import datetime
+import base64
+import io
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
+from PIL import Image
 
 DATA_FIL = "familie_data.json"
 TIDSSONE_NORGE = ZoneInfo("Europe/Oslo")
 
 STANDARD_MIDDAGER = {
-    "Taco": ["Kjøttdeig", "Tacokrydder", "Tortillalefser", "Rømme", "Ost", "Salsa", "Mais", "Agurk"],
-    "Laks med grønnsaker og poteter": ["Laksefilet", "Poteter", "Gulrøtter", "Rømme", "Sitron"],
-    "Spagetti bolognese": ["Spagetti", "Kjøttdeig", "Hakkede tomater", "Løk", "Hvitløk", "Parmesan"],
-    "Hjemmelaget pizza": ["Pizzadeig", "Pizzasaus", "Ost", "Skinke", "Champignon"],
-    "Kyllingwok": ["Kyllingfilet", "Wokgrønnsaker", "Woksaus", "Ris eller nudler"],
-    "Fiskepinner med potetmos": ["Fiskepinner", "Poteter", "Erter", "Smør", "Melk"],
-    "Kjøttkaker i brun saus": ["Kjøttkaker", "Brun saus", "Poteter", "Tyttebærsyltetøy", "Ertestuing"],
-    "Pannekaker med bacon": ["Hvetemel", "Egg", "Melk", "Bacon", "Blåbærsyltetøy"],
-    "Pølseform / Pølsegrateng": ["Kjøttpølser", "Makaroni", "Hvit saus", "Ost", "Brokkoli"]
+    "Taco": {
+        "ingredienser": ["Kjøttdeig", "Tacokrydder", "Tortillalefser", "Rømme", "Ost", "Salsa", "Mais", "Agurk"],
+        "bilde": None
+    },
+    "Laks med grønnsaker og poteter": {
+        "ingredienser": ["Laksefilet", "Poteter", "Gulrøtter", "Rømme", "Sitron"],
+        "bilde": None
+    },
+    "Spagetti bolognese": {
+        "ingredienser": ["Spagetti", "Kjøttdeig", "Hakkede tomater", "Løk", "Hvitløk", "Parmesan"],
+        "bilde": None
+    },
+    "Hjemmelaget pizza": {
+        "ingredienser": ["Pizzadeig", "Pizzasaus", "Ost", "Skinke", "Champignon"],
+        "bilde": None
+    },
+    "Kyllingwok": {
+        "ingredienser": ["Kyllingfilet", "Wokgrønnsaker", "Woksaus", "Ris eller nudler"],
+        "bilde": None
+    },
+    "Fiskepinner med potetmos": {
+        "ingredienser": ["Fiskepinner", "Poteter", "Erter", "Smør", "Melk"],
+        "bilde": None
+    },
+    "Kjøttkaker i brun saus": {
+        "ingredienser": ["Kjøttkaker", "Brun saus", "Poteter", "Tyttebærsyltetøy", "Ertestuing"],
+        "bilde": None
+    },
+    "Pannekaker med bacon": {
+        "ingredienser": ["Hvetemel", "Egg", "Melk", "Bacon", "Blåbærsyltetøy"],
+        "bilde": None
+    },
+    "Pølseform / Pølsegrateng": {
+        "ingredienser": ["Kjøttpølser", "Makaroni", "Hvit saus", "Ost", "Brokkoli"],
+        "bilde": None
+    }
 }
 
 KATEGORI_REGLER = {
@@ -59,6 +89,21 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
+def bilde_til_base64(opplastet_fil):
+    """Komprimerer bildet til maks 600px bredde og gjør det om til en Base64-streng"""
+    try:
+        bilde = Image.open(opplastet_fil)
+        bilde = bilde.convert("RGB")
+        max_str = 600
+        if max(bilde.size) > max_str:
+            bilde.thumbnail((max_str, max_str), Image.Resampling.LANCZOS)
+        buffer = io.BytesIO()
+        bilde.save(buffer, format="JPEG", quality=75)
+        kodet = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return f"data:image/jpeg;base64,{kodet}"
+    except Exception:
+        return None
+
 def gjett_kategori(varenavn):
     tekst = varenavn.lower()
     for kat, stikkord_liste in KATEGORI_REGLER.items():
@@ -67,6 +112,19 @@ def gjett_kategori(varenavn):
                 return kat
     return "📦 Annet / Diverse"
 
+def migrer_oppskrifter(gamle_oppskrifter):
+    nye = {}
+    for tittel, val in gamle_oppskrifter.items():
+        if isinstance(val, list):
+            nye[tittel] = {"ingredienser": val, "bilde": None}
+        elif isinstance(val, dict):
+            if "ingredienser" not in val:
+                val["ingredienser"] = []
+            if "bilde" not in val:
+                val["bilde"] = None
+            nye[tittel] = val
+    return nye
+
 def migrer_handleliste(gammel_liste):
     ny_liste = []
     for item in gammel_liste:
@@ -74,12 +132,15 @@ def migrer_handleliste(gammel_liste):
             ny_liste.append({
                 "id": str(uuid.uuid4()),
                 "navn": item,
+                "mengde": "",
                 "kategori": gjett_kategori(item),
                 "kjopt": False
             })
         elif isinstance(item, dict):
             if "id" not in item:
                 item["id"] = str(uuid.uuid4())
+            if "mengde" not in item:
+                item["mengde"] = ""
             if "kategori" not in item:
                 item["kategori"] = gjett_kategori(item.get("navn", ""))
             if "kjopt" not in item:
@@ -107,6 +168,8 @@ def last_data():
                     d["beskjeder"] = [
                         {"id": str(uuid.uuid4()), "tekst": "Husk gymtøy i morgen! 🏃‍♂️", "fra": "Mor", "tid": "Kl. 08:00"}
                     ]
+                if "merkedager" not in d:
+                    d["merkedager"] = []
                 if "belonninger" not in d:
                     d["belonninger"] = [
                         {"id": str(uuid.uuid4()), "tittel": "30 min ekstra skjermtid", "pris": 5},
@@ -115,6 +178,8 @@ def last_data():
                     ]
                 if "oppskrifter" not in d:
                     d["oppskrifter"] = STANDARD_MIDDAGER
+                else:
+                    d["oppskrifter"] = migrer_oppskrifter(d["oppskrifter"])
                 if "middagsplan" not in d:
                     gamle_middager = d.get("middager", {})
                     d["middagsplan"] = {
@@ -142,6 +207,7 @@ def last_data():
         "beskjeder": [
             {"id": str(uuid.uuid4()), "tekst": "Husk gymtøy i morgen! 🏃‍♂️", "fra": "Mor", "tid": "Kl. 08:00"}
         ],
+        "merkedager": [],
         "belonninger": [
             {"id": str(uuid.uuid4()), "tittel": "30 min ekstra skjermtid", "pris": 5},
             {"id": str(uuid.uuid4()), "tittel": "Velge lørdagsgodt", "pris": 8},
@@ -163,17 +229,24 @@ def lagre_data(data):
 
 data = last_data()
 
-# AUTOMATISK NULLSTILLING VED MIDNATT (NORSK TID)
-idag_str = datetime.now(TIDSSONE_NORGE).strftime("%Y-%m-%d")
+# ----------------- MIDNATT-NULLSTILLING -----------------
+idag_dato = datetime.now(TIDSSONE_NORGE).date()
+idag_str = idag_dato.strftime("%Y-%m-%d")
+
 if data.get("sist_nullstilt") != idag_str:
     for o in data["oppgaver"]:
         if o.get("gjentakende", False):
             o["ferdig"] = False
             o["fullfort_av"] = None
+    # Fjern merkedager som er passert
+    data["merkedager"] = [
+        m for m in data.get("merkedager", [])
+        if datetime.strptime(m["dato"], "%Y-%m-%d").date() >= idag_dato
+    ]
     data["sist_nullstilt"] = idag_str
     lagre_data(data)
 
-def legg_til_vare_i_data(varenavn, kategori=None):
+def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
     if not varenavn.strip():
         return False
     renset_navn = varenavn.strip()
@@ -185,6 +258,7 @@ def legg_til_vare_i_data(varenavn, kategori=None):
     data["handleliste"].append({
         "id": str(uuid.uuid4()),
         "navn": renset_navn,
+        "mengde": mengde.strip(),
         "kategori": valgt_kat,
         "kjopt": False
     })
@@ -250,7 +324,6 @@ with st.sidebar:
                 st.toast("PIN-kode er oppdatert!")
     else:
         st.info("🔒 Barnemodus aktiv")
-        st.caption("Endringer og sletting er låst for barna.")
         tastet_pin = st.text_input("PIN for mor/far:", type="password", placeholder="Standard: 1234")
         if st.button("Lås opp", use_container_width=True):
             if tastet_pin == data.get("pin", "1234"):
@@ -259,7 +332,7 @@ with st.sidebar:
             else:
                 st.error("Feil PIN-kode!")
 
-# ----------------- MOBILVENNLIG TOPPSTRIPE -----------------
+# ----------------- MOBIL TOPPSTRIPE & MERKEDAGER / KALENDER -----------------
 naa = datetime.now(TIDSSONE_NORGE)
 dag_indeks = naa.weekday()
 idag_navn = DAGER[dag_indeks]
@@ -268,7 +341,7 @@ klokke_tekst = naa.strftime("%H:%M")
 
 st.markdown(
     f"""
-    <div style="background-color: #EFF6FF; border-radius: 12px; padding: 12px; text-align: center; margin-bottom: 15px; border: 1px solid #BFDBFE;">
+    <div style="background-color: #EFF6FF; border-radius: 12px; padding: 12px; text-align: center; margin-bottom: 8px; border: 1px solid #BFDBFE;">
         <h2 style="margin: 0; color: #1E3A8A; font-size: 1.5rem;">🏡 Familiehub</h2>
         <div style="margin-top: 4px; font-size: 1.05rem; font-weight: 600; color: #1E40AF;">
             📅 {dato_tekst} &nbsp;•&nbsp; ⏰ kl. {klokke_tekst}
@@ -278,8 +351,74 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ----------------- PÅMINNELSER (MOBILVENNLIG) -----------------
-with st.expander("📌 Familiens Oppslagstavle", expanded=False):
+with st.expander("🗓️ **Familiens Kalender & Merkedager (Trykk her)**", expanded=False):
+    merkedager = data.get("merkedager", [])
+    slett_merkedag_id = None
+    
+    if merkedager:
+        # Sorter kronologisk
+        merkedager_sortert = sorted(merkedager, key=lambda x: x["dato"])
+        for m in merkedager_sortert:
+            m_dato = datetime.strptime(m["dato"], "%Y-%m-%d").date()
+            dager_igjen = (m_dato - idag_dato).days
+            
+            if dager_igjen == 0:
+                nedtelling = "🎉 I DAG!"
+                bg_farge = "#D1FAE5"
+                kant_farge = "#10B981"
+            elif dager_igjen == 1:
+                nedtelling = "⏰ I morgen!"
+                bg_farge = "#FEF3C7"
+                kant_farge = "#F59E0B"
+            else:
+                nedtelling = f"⏳ Om {dager_igjen} dager"
+                bg_farge = "#F0FDF4"
+                kant_farge = "#3B82F6"
+
+            c_info, c_slett = st.columns([0.84, 0.16])
+            with c_info:
+                st.markdown(
+                    f"""
+                    <div style="background-color: {bg_farge}; border-left: 4px solid {kant_farge}; padding: 8px 12px; border-radius: 6px; margin-bottom: 6px;">
+                        <span style="font-size: 1.05rem; font-weight: 700; color: #1F2937;">{m.get('ikon', '📌')} {m['tittel']}</span><br>
+                        <span style="font-size: 0.85rem; color: #4B5563;">📅 {m_dato.strftime('%d.%m.%Y')} — <b>{nedtelling}</b></span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            with c_slett:
+                if st.button("✕", key=f"del_m_{m['id']}", help="Fjern hendelse"):
+                    slett_merkedag_id = m["id"]
+
+        if slett_merkedag_id:
+            data["merkedager"] = [m for m in data["merkedager"] if m["id"] != slett_merkedag_id]
+            lagre_data(data)
+            st.rerun()
+    else:
+        st.caption("Ingen merkedager lagt inn. Legg inn bursdager, skoleturer eller ferier under!")
+
+    st.write("---")
+    with st.form("form_ny_merkedag", clear_on_submit=True):
+        st.markdown("##### ➕ Legg til merkedag / påminnelse")
+        m_tittel = st.text_input("Hva skal skje?", placeholder="f.eks. Bursdag, Sommerferie, Tannlege")
+        col_d, col_i = st.columns([0.65, 0.35])
+        m_dato_valg = col_d.date_input("Dato:", min_value=idag_dato, value=idag_dato)
+        m_ikon = col_i.selectbox("Type:", ["🎂 Bursdag", "✈️ Ferie/Tur", "🦷 Tannlege/Lege", "🎒 Skole/Barnehage", "📌 Annet"])
+        
+        if st.form_submit_button("Lagre i kalenderen", use_container_width=True) and m_tittel.strip():
+            rent_ikon = m_ikon.split()[0]
+            data["merkedager"].append({
+                "id": str(uuid.uuid4()),
+                "tittel": m_tittel.strip(),
+                "dato": m_dato_valg.strftime("%Y-%m-%d"),
+                "ikon": rent_ikon
+            })
+            lagre_data(data)
+            st.toast("Merkedag lagret!")
+            st.rerun()
+
+# ----------------- OPPKOPLING TIL OPPSTAVLE -----------------
+with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
     beskjeder = data.get("beskjeder", [])
     slett_beskjed_id = None
     if beskjeder:
@@ -528,7 +667,7 @@ with fane_butikk:
                     lagre_data(data)
                     st.rerun()
 
-# ----------------- FANE 3: MIDDAGSPLAN -----------------
+# ----------------- FANE 3: MIDDAGSPLAN MED BILDEVISNING -----------------
 with fane_middag:
     oppskrifter = data.get("oppskrifter", STANDARD_MIDDAGER)
     oppskriftsliste = sorted(list(oppskrifter.keys()))
@@ -542,8 +681,9 @@ with fane_middag:
             for d in DAGER:
                 rett = st.session_state.get(f"rett_{d}", "").strip()
                 if rett in oppskrifter:
-                    for ing in oppskrifter[rett]:
-                        if legg_til_vare_i_data(ing):
+                    ingr = oppskrifter[rett].get("ingredienser", [])
+                    for i_navn in ingr:
+                        if legg_til_vare_i_data(i_navn):
                             lagt += 1
             lagre_data(data)
             st.toast(f"{lagt} ingredienser lagt i handlelisten! 🛒")
@@ -556,27 +696,32 @@ with fane_middag:
     for dag in DAGER:
         er_idag = (dag == idag_navn)
         dag_data = data["middagsplan"].get(dag, {"rett": "", "kokk": "Ingen valgt", "onske": "Ingen"})
-        dagens_rett = st.session_state.get(f"rett_{dag}", "")
+        valgt_rett = st.session_state.get(f"rett_{dag}", "")
         
         tittel_dag = f"👉 **{dag} (I dag)**" if er_idag else f"📅 **{dag}**"
         
         with st.container():
             st.markdown(f"#### {tittel_dag}")
+
+            # Vis bilde av valgt middag dersom tilgjengelig
+            if valgt_rett in oppskrifter and oppskrifter[valgt_rett].get("bilde"):
+                st.image(oppskrifter[valgt_rett]["bilde"], use_container_width=True)
             
             c_r1, c_r2 = st.columns([0.82, 0.18])
-            valgt_rett = c_r1.text_input(
+            ny_rett = c_r1.text_input(
                 f"Rett {dag}", 
+                value=valgt_rett,
                 key=f"rett_{dag}", 
                 placeholder="Hva skal dere spise?", 
                 label_visibility="collapsed"
             )
             
-            if valgt_rett in oppskrifter:
-                if c_r2.button("🛒", key=f"kjop_dag_{dag}", help=f"Kjøp til {valgt_rett}"):
-                    for ing in oppskrifter[valgt_rett]:
-                        legg_til_vare_i_data(ing)
+            if ny_rett in oppskrifter:
+                if c_r2.button("🛒", key=f"kjop_dag_{dag}", help=f"Kjøp til {ny_rett}"):
+                    for i_navn in oppskrifter[ny_rett].get("ingredienser", []):
+                        legg_til_vare_i_data(i_navn)
                     lagre_data(data)
-                    st.toast(f"Ingredienser til {valgt_rett} lagt til!")
+                    st.toast(f"Ingredienser til {ny_rett} lagt til!")
             else:
                 c_r2.write("")
 
@@ -594,11 +739,11 @@ with fane_middag:
                 key=f"kokk_{dag}"
             )
 
-            if (valgt_rett != dag_data.get("rett", "") or 
+            if (ny_rett != dag_data.get("rett", "") or 
                 valgt_onske != dag_data.get("onske", "Ingen") or 
                 valgt_kokk != dag_data.get("kokk", "Ingen valgt")):
                 data["middagsplan"][dag] = {
-                    "rett": valgt_rett,
+                    "rett": ny_rett,
                     "onske": valgt_onske,
                     "kokk": valgt_kokk
                 }
@@ -609,20 +754,45 @@ with fane_middag:
     if plan_oppdatert:
         lagre_data(data)
 
-    with st.expander("📖 **Familiens Kokebok & Retter**", expanded=False):
+    # Oppskriftsbok med visuelle bildekort
+    with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
-        for tittel, ingr_liste in sorted(oppskrifter.items()):
-            st.markdown(f"**{tittel}**")
-            st.caption(", ".join(ingr_liste) if ingr_liste else "Ingen ingredienser lagt inn")
+        for tittel, info in sorted(oppskrifter.items()):
+            ingr_liste = info.get("ingredienser", [])
+            bilde_url = info.get("bilde")
+            
+            st.markdown(f"### 🍽️ {tittel}")
+            if bilde_url:
+                st.image(bilde_url, use_container_width=True)
+            else:
+                st.info("📷 Ingen bilde lagt til enda.")
+
+            st.caption(f"Ingredienser: {', '.join(ingr_liste)}" if ingr_liste else "Ingen ingredienser lagt inn")
             
             c_d, c_s = st.columns([0.55, 0.45])
             valgt_dag = c_d.selectbox(f"Dag for {tittel}", DAGER, key=f"v_dag_{tittel}", label_visibility="collapsed")
             c_s.button("Sett på meny 📅", key=f"s_meny_{tittel}", on_click=cb_sett_middag, args=(valgt_dag, tittel), use_container_width=True)
             
+            # Legg til eller endre bilde for retten
+            with st.expander(f"📸 Endre / Legg til bilde for {tittel}"):
+                nytt_bilde_fil = st.file_uploader(
+                    f"Last opp eller ta bilde av {tittel}:", 
+                    type=["png", "jpg", "jpeg"], 
+                    key=f"file_{tittel}"
+                )
+                if st.button("Lagre bilde 💾", key=f"btn_bilde_{tittel}"):
+                    if nytt_bilde_fil:
+                        b64 = bilde_til_base64(nytt_bilde_fil)
+                        if b64:
+                            oppskrifter[tittel]["bilde"] = b64
+                            lagre_data(data)
+                            st.toast(f"Bilde lagret for {tittel}!")
+                            st.rerun()
+
             if er_forelder:
                 if st.button("Slett oppskrift ✕", key=f"del_op_{tittel}"):
                     slett_oppskrift = tittel
-            st.write("---")
+            st.divider()
 
         if slett_oppskrift:
             del data["oppskrifter"][slett_oppskrift]
@@ -631,23 +801,35 @@ with fane_middag:
 
         if er_forelder:
             with st.form("form_ny_oppskrift", clear_on_submit=True):
-                ny_r = st.text_input("Rett:")
-                ny_i = st.text_area("Ingredienser (komma mellom):")
+                st.markdown("##### ➕ Legg til en ny rett")
+                ny_r = st.text_input("Navn på retten:")
+                ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
+                nytt_opp_bilde = st.file_uploader("Bilde av retten (valgfritt):", type=["png", "jpg", "jpeg"])
+                
                 if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
-                    data["oppskrifter"][ny_r.strip()] = [x.strip() for x in ny_i.split(",") if x.strip()]
+                    ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
+                    b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
+                    data["oppskrifter"][ny_r.strip()] = {
+                        "ingredienser": ingr_liste_ren,
+                        "bilde": b64_str
+                    }
                     lagre_data(data)
+                    st.toast(f"{ny_r.strip()} er lagt til!")
                     st.rerun()
 
-# ----------------- FANE 4: HANDLELISTE -----------------
+# ----------------- FANE 4: SMART HANDLELISTE (MENGDE & BUNNSORTERING) -----------------
 with fane_handleliste:
     st.subheader("🛒 Handleliste")
 
     with st.form("form_ny_vare", clear_on_submit=True):
-        ny_v = st.text_input("Ny vare:", placeholder="f.eks. Melk, Kjøttdeig")
+        col_v, col_m = st.columns([0.65, 0.35])
+        ny_v = col_v.text_input("Vare:", placeholder="f.eks. Melk, Kjøttdeig")
+        ny_mengde = col_m.text_input("Mengde:", placeholder="f.eks. 2 pk, 1L")
         ny_kat = st.selectbox("Avdeling:", ["✨ Automatisk"] + AVDELINGER)
+        
         if st.form_submit_button("Legg til vare", use_container_width=True) and ny_v.strip():
             k = None if ny_kat == "✨ Automatisk" else ny_kat
-            if legg_til_vare_i_data(ny_v, k):
+            if legg_til_vare_i_data(ny_v, ny_mengde, k):
                 lagre_data(data)
                 st.rerun()
 
@@ -661,11 +843,19 @@ with fane_handleliste:
             varer_i_avd = [v for v in data["handleliste"] if v.get("kategori") == avd]
             if varer_i_avd:
                 st.markdown(f"##### {avd} ({len(varer_i_avd)})")
-                for v in varer_i_avd:
+                
+                # SMART SORTERING: Uavkrysset øverst, avkryssede nederst!
+                varer_sortert = sorted(varer_i_avd, key=lambda x: 1 if x.get("kjopt", False) else 0)
+                
+                for v in varer_sortert:
                     v_id = v["id"]
                     er_kjopt = v.get("kjopt", False)
+                    mengde_tekst = f" `({v['mengde']})`" if v.get("mengde") else ""
 
-                    visningstekst = f"~~{v['navn']}~~" if er_kjopt else f"**{v['navn']}**"
+                    if er_kjopt:
+                        visningstekst = f"~~{v['navn']}{mengde_tekst}~~"
+                    else:
+                        visningstekst = f"**{v['navn']}**{mengde_tekst}"
 
                     ny_status = st.checkbox(
                         visningstekst, 
