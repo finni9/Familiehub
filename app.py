@@ -51,6 +51,15 @@ STANDARD_MIDDAGER = {
     }
 }
 
+STANDARD_BASISVARER = [
+    {"id": "b1", "label": "🥛 Melk", "navn": "Melk", "kategori": "🧀 Meieri & Kjølevare"},
+    {"id": "b2", "label": "🍞 Brød", "navn": "Brød", "kategori": "🍞 Tørrvare, Krydder & Kolonial"},
+    {"id": "b3", "label": "🧈 Smør", "navn": "Smør", "kategori": "🧀 Meieri & Kjølevare"},
+    {"id": "b4", "label": "🥚 Egg", "navn": "Egg", "kategori": "🧀 Meieri & Kjølevare"},
+    {"id": "b5", "label": "🍌 Bananer", "navn": "Bananer", "kategori": "🥦 Frukt & Grønt"},
+    {"id": "b6", "label": "☕ Kaffe", "navn": "Kaffe", "kategori": "🍞 Tørrvare, Krydder & Kolonial"},
+]
+
 KATEGORI_REGLER = {
     "🥦 Frukt & Grønt": [
         "potet", "gulrot", "løk", "hvitløk", "mais", "agurk", "tomat", "sitron", 
@@ -179,6 +188,7 @@ def standard_data():
         ],
         "oppskrifter": STANDARD_MIDDAGER,
         "middagsplan": {dag: "" for dag in DAGER},
+        "basisvarer": STANDARD_BASISVARER,
         "handleliste": migrer_handleliste(["Melk", "Brød", "Smør"])
     }
 
@@ -191,6 +201,7 @@ def last_data():
             if "merkedager" not in d: d["merkedager"] = []
             if "oppskrifter" not in d: d["oppskrifter"] = STANDARD_MIDDAGER
             else: d["oppskrifter"] = migrer_oppskrifter(d["oppskrifter"])
+            if "basisvarer" not in d: d["basisvarer"] = STANDARD_BASISVARER
             d["handleliste"] = migrer_handleliste(d.get("handleliste", []))
             d["middagsplan"] = migrer_middagsplan(d.get("middagsplan", {}))
             return d
@@ -229,8 +240,16 @@ if data.get("sist_nullstilt") != idag_str:
 def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
     if not varenavn.strip(): return False
     renset_navn = varenavn.strip()
-    eksisterende = [v["navn"].lower() for v in data["handleliste"]]
-    if renset_navn.lower() in eksisterende: return False
+    
+    # Hvis varen finnes, men er krysset av, vekk den til live igjen
+    for v in data["handleliste"]:
+        if v["navn"].lower() == renset_navn.lower():
+            if v.get("kjopt", False):
+                v["kjopt"] = False
+                if mengde.strip():
+                    v["mengde"] = mengde.strip()
+                return True
+            return False  # Allerede uavkrysset i lista
     
     valgt_kat = kategori if kategori and kategori in AVDELINGER else gjett_kategori(renset_navn)
     data["handleliste"].append({
@@ -442,7 +461,6 @@ with fane_oppgaver:
     if data.get("belonninger"):
         billigste_premie = min(data["belonninger"], key=lambda x: x["pris"])
 
-    # VISUELL STJERNETAVLE FOR BARNA ØVERST
     if stjerne_brukere:
         st.markdown("#### 🌟 Familiens Stjernetavle")
         kolonner = st.columns(len(stjerne_brukere))
@@ -640,7 +658,7 @@ with fane_butikk:
                     lagre_data(data)
                     st.rerun()
 
-# ----------------- FANE 3: MIDDAG MED BILDER (UTEN KOKK / ØNSKE) -----------------
+# ----------------- FANE 3: MIDDAG MED BILDER -----------------
 with fane_middag:
     oppskrifter = data.get("oppskrifter", STANDARD_MIDDAGER)
     oppskriftsliste = sorted(list(oppskrifter.keys()))
@@ -743,40 +761,30 @@ with fane_middag:
                     st.toast(f"{ny_r.strip()} er lagt til!")
                     st.rerun()
 
-# ----------------- FANE 4: HANDLELISTE MED HURTIGVALG -----------------
+# ----------------- FANE 4: HANDLELISTE MED DYNAMISKE HURTIGKNAPPER -----------------
 with fane_handleliste:
     st.subheader("🛒 Handleliste")
 
-    # Hurtigknapper for vanlige basisvarer
-    st.caption("⚡ **Hurtigknapper for basisvarer:**")
-    basisvarer = [
-        ("🥛 Melk", "Melk", "🧀 Meieri & Kjølevare"),
-        ("🍞 Brød", "Brød", "🍞 Tørrvare, Krydder & Kolonial"),
-        ("🧈 Smør", "Smør", "🧀 Meieri & Kjølevare"),
-        ("🥚 Egg", "Egg", "🧀 Meieri & Kjølevare"),
-        ("🍌 Bananer", "Bananer", "🥦 Frukt & Grønt"),
-        ("☕ Kaffe", "Kaffe", "🍞 Tørrvare, Krydder & Kolonial"),
-    ]
-
-    c_rad1 = st.columns(3)
-    for idx, (label, navn, kat) in enumerate(basisvarer[:3]):
-        if c_rad1[idx].button(f"+ {label}", key=f"quick_{navn}", use_container_width=True):
-            if legg_til_vare_i_data(navn, "", kat):
-                lagre_data(data)
-                st.toast(f"Lagt til {navn}!")
-                st.rerun()
-            else:
-                st.toast(f"{navn} er allerede i listen! 👍")
-
-    c_rad2 = st.columns(3)
-    for idx, (label, navn, kat) in enumerate(basisvarer[3:]):
-        if c_rad2[idx].button(f"+ {label}", key=f"quick_{navn}", use_container_width=True):
-            if legg_til_vare_i_data(navn, "", kat):
-                lagre_data(data)
-                st.toast(f"Lagt til {navn}!")
-                st.rerun()
-            else:
-                st.toast(f"{navn} er allerede i listen! 👍")
+    basisvarer = data.get("basisvarer", STANDARD_BASISVARER)
+    if basisvarer:
+        st.caption("⚡ **Hurtigknapper for basisvarer:**")
+        kol_per_rad = 3
+        for start_idx in range(0, len(basisvarer), kol_per_rad):
+            rad_varer = basisvarer[start_idx:start_idx + kol_per_rad]
+            cols = st.columns(len(rad_varer))
+            for c_idx, b_item in enumerate(rad_varer):
+                b_label = b_item.get("label", b_item.get("navn", "Vare"))
+                b_navn = b_item.get("navn", b_label)
+                b_kat = b_item.get("kategori", gjett_kategori(b_navn))
+                b_id = b_item.get("id", str(uuid.uuid4()))
+                
+                if cols[c_idx].button(f"+ {b_label}", key=f"quick_btn_{b_id}", use_container_width=True):
+                    if legg_til_vare_i_data(b_navn, "", b_kat):
+                        lagre_data(data)
+                        st.toast(f"Lagt til {b_navn}!")
+                        st.rerun()
+                    else:
+                        st.toast(f"{b_navn} ligger allerede klar i listen! 👍")
 
     st.write("")
 
@@ -838,6 +846,9 @@ with fane_handleliste:
 if er_forelder and fane_familie:
     with fane_familie:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
+        
+        # 1. Medlemmer
+        st.markdown("#### 👤 Familiemedlemmer")
         for i, person in enumerate(list(data["medlemmer"])):
             st.markdown(f"**Person {i+1}: {person}**")
             nytt_navn = st.text_input(f"Navn", value=person, key=f"adm_navn_{i}")
@@ -871,7 +882,7 @@ if er_forelder and fane_familie:
                 if person in data.get("poeng", {}): data["poeng"].pop(person)
                 lagre_data(data)
                 st.rerun()
-            st.divider()
+            st.write("")
 
         with st.form("form_nytt_medlem", clear_on_submit=True):
             f_n = st.text_input("Ny person:")
@@ -883,4 +894,51 @@ if er_forelder and fane_familie:
                         data["stjerne_brukere"].append(f_n.strip())
                         data["poeng"][f_n.strip()] = 0
                     lagre_data(data)
+                    st.rerun()
+
+        st.divider()
+
+        # 2. Hurtigknapper for basisvarer
+        st.markdown("#### ⚡ Administrer Hurtigknapper for basisvarer")
+        st.caption("Her bestemmer mor og far hvilke knapper som dukker opp øverst på handlelisten.")
+        
+        basisvarer = data.get("basisvarer", STANDARD_BASISVARER)
+        slett_b_id = None
+        for b in basisvarer:
+            c_b_navn, c_b_kat, c_b_slett = st.columns([0.45, 0.40, 0.15])
+            c_b_navn.markdown(f"**{b.get('label', b.get('navn'))}**")
+            c_b_kat.caption(f"{b.get('kategori')}")
+            if c_b_slett.button("✕", key=f"del_b_{b['id']}", help=f"Slett {b.get('navn')}"):
+                slett_b_id = b["id"]
+
+        if slett_b_id:
+            data["basisvarer"] = [x for x in data["basisvarer"] if x["id"] != slett_b_id]
+            lagre_data(data)
+            st.toast("Hurtigknapp slettet!")
+            st.rerun()
+
+        st.write("")
+        with st.expander("➕ **Legg til ny hurtigknapp**"):
+            with st.form("form_ny_basisvare", clear_on_submit=True):
+                col_i, col_n = st.columns([0.3, 0.7])
+                ny_ikon = col_i.text_input("Ikon / Emoji:", value="🍎")
+                ny_b_navn = col_n.text_input("Varenavn:", placeholder="f.eks. Epler, Juice, Havregrøt")
+                ny_b_kat = st.selectbox("Avdeling:", ["✨ Automatisk"] + AVDELINGER)
+                
+                if st.form_submit_button("Lagre hurtigknapp", use_container_width=True) and ny_b_navn.strip():
+                    renset_navn = ny_b_navn.strip()
+                    valgt_kat = gjett_kategori(renset_navn) if ny_b_kat == "✨ Automatisk" else ny_b_kat
+                    label_tekst = f"{ny_ikon.strip()} {renset_navn}" if ny_ikon.strip() else renset_navn
+                    
+                    if "basisvarer" not in data:
+                        data["basisvarer"] = list(STANDARD_BASISVARER)
+                    
+                    data["basisvarer"].append({
+                        "id": str(uuid.uuid4()),
+                        "label": label_tekst,
+                        "navn": renset_navn,
+                        "kategori": valgt_kat
+                    })
+                    lagre_data(data)
+                    st.toast(f"Lagt til hurtigknapp for {renset_navn}!")
                     st.rerun()
