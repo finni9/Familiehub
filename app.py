@@ -70,7 +70,7 @@ KATEGORI_REGLER = {
         "tacokrydder", "tortilla", "lefse", "spagetti", "pasta", "makaroni", 
         "pizzadeig", "pizzasaus", "salsa", "woksaus", "brun saus", "hvit saus", 
         "saus", "ris", "nudler", "hvetemel", "mel", "sukker", "havregryn", 
-        "syltetøy", "brød", "rundstykke", "knekkebrød", "olje", "krydder"
+        "syltetøy", "brød", "rundstykke", "knekkebrød", "olje", "krydder", "kaffe"
     ]
 }
 
@@ -743,13 +743,46 @@ with fane_middag:
                     st.toast(f"{ny_r.strip()} er lagt til!")
                     st.rerun()
 
-# ----------------- FANE 4: HANDLELISTE -----------------
+# ----------------- FANE 4: HANDLELISTE MED HURTIGVALG -----------------
 with fane_handleliste:
     st.subheader("🛒 Handleliste")
 
+    # Hurtigknapper for vanlige basisvarer
+    st.caption("⚡ **Hurtigknapper for basisvarer:**")
+    basisvarer = [
+        ("🥛 Melk", "Melk", "🧀 Meieri & Kjølevare"),
+        ("🍞 Brød", "Brød", "🍞 Tørrvare, Krydder & Kolonial"),
+        ("🧈 Smør", "Smør", "🧀 Meieri & Kjølevare"),
+        ("🥚 Egg", "Egg", "🧀 Meieri & Kjølevare"),
+        ("🍌 Bananer", "Bananer", "🥦 Frukt & Grønt"),
+        ("☕ Kaffe", "Kaffe", "🍞 Tørrvare, Krydder & Kolonial"),
+    ]
+
+    c_rad1 = st.columns(3)
+    for idx, (label, navn, kat) in enumerate(basisvarer[:3]):
+        if c_rad1[idx].button(f"+ {label}", key=f"quick_{navn}", use_container_width=True):
+            if legg_til_vare_i_data(navn, "", kat):
+                lagre_data(data)
+                st.toast(f"Lagt til {navn}!")
+                st.rerun()
+            else:
+                st.toast(f"{navn} er allerede i listen! 👍")
+
+    c_rad2 = st.columns(3)
+    for idx, (label, navn, kat) in enumerate(basisvarer[3:]):
+        if c_rad2[idx].button(f"+ {label}", key=f"quick_{navn}", use_container_width=True):
+            if legg_til_vare_i_data(navn, "", kat):
+                lagre_data(data)
+                st.toast(f"Lagt til {navn}!")
+                st.rerun()
+            else:
+                st.toast(f"{navn} er allerede i listen! 👍")
+
+    st.write("")
+
     with st.form("form_ny_vare", clear_on_submit=True):
         col_v, col_m = st.columns([0.65, 0.35])
-        ny_v = col_v.text_input("Vare:", placeholder="f.eks. Melk, Kjøttdeig")
+        ny_v = col_v.text_input("Vare:", placeholder="f.eks. Kjøttdeig, Epler")
         ny_mengde = col_m.text_input("Mengde:", placeholder="f.eks. 2 pk, 1L")
         ny_kat = st.selectbox("Avdeling:", ["✨ Automatisk"] + AVDELINGER)
         
