@@ -432,25 +432,30 @@ with fane_oppgaver:
     if data.get("belonninger"):
         billigste_premie = min(data["belonninger"], key=lambda x: x["pris"])
 
-    # VISUELL STJERNETAVLE FOR BARNA ØVERST
+# VISUELL STJERNETAVLE FOR BARNA ØVERST
     if stjerne_brukere:
         st.markdown("#### 🌟 Familiens Stjernetavle")
         kolonner = st.columns(len(stjerne_brukere))
         
         for idx, person in enumerate(stjerne_brukere):
-            antall_stjerner = data["poeng"].get(person, 0)
+            antall_stjerner = int(data["poeng"].get(person, 0))
             with kolonner[idx]:
-                # Generer stjernestreng (maks 10 stjerner vist fysisk for å holde det pent)
-                fysiske_stjerner = "⭐" * min(antall_stjerner, 10)
-                pluss_tekst = f" (+{antall_stjerner - 10})" if antall_stjerner > 10 else ""
-                
-                motivasjon = ""
-                if billigste_premie:
-                    mangler = billigste_premie["pris"] - antall_stjerner
-                    if mangler <= 0:
-                        motivasjon = f"<div style='font-size: 0.75rem; color: #047857; font-weight: 700; margin-top: 4px;'>🎉 Råd til {billigste_premie['tittel']}!</div>"
-                    else:
-                        motivasjon = f"<div style='font-size: 0.72rem; color: #B45309; margin-top: 4px;'>🎯 Bare <b>{mangler} ⭐</b> til {billigste_premie['tittel']}</div>"
+                if antall_stjerner == 0:
+                    stjerne_symboler = "<span style='color: #CA8A04; opacity: 0.4;'>☆☆☆☆☆</span>"
+                    pluss_tekst = ""
+                    motivasjon = "<div style='font-size: 0.72rem; color: #854D0E; font-weight: 600; margin-top: 4px;'>🚀 Gjør en oppgave for å få din første stjerne!</div>"
+                else:
+                    synlige = min(antall_stjerner, 10)
+                    stjerne_symboler = "⭐" * synlige
+                    pluss_tekst = f" <span style='font-size: 0.8rem; font-weight: 700; color: #854D0E;'>(+{antall_stjerner - 10})</span>" if antall_stjerner > 10 else ""
+                    
+                    motivasjon = ""
+                    if billigste_premie:
+                        mangler = billigste_premie["pris"] - antall_stjerner
+                        if mangler <= 0:
+                            motivasjon = f"<div style='font-size: 0.75rem; color: #047857; font-weight: 700; margin-top: 4px;'>🎉 Råd til {billigste_premie['tittel']}!</div>"
+                        else:
+                            motivasjon = f"<div style='font-size: 0.72rem; color: #B45309; margin-top: 4px;'>🎯 Bare <b>{mangler} ⭐</b> til {billigste_premie['tittel']}</div>"
 
                 st.markdown(
                     f"""
@@ -461,8 +466,8 @@ with fane_oppgaver:
                         <div style="font-size: 1.8rem; font-weight: 900; color: #A16207; line-height: 1.1; margin: 4px 0;">
                             {antall_stjerner} <span style="font-size: 1.3rem;">⭐</span>
                         </div>
-                        <div style="font-size: 0.9rem; letter-spacing: 1px; min-height: 18px;">
-                            {fysiske_stjerner}{pluss_tekst}
+                        <div style="font-size: 1.05rem; letter-spacing: 2px; min-height: 22px;">
+                            {stjerne_symboler}{pluss_tekst}
                         </div>
                         {motivasjon}
                     </div>
