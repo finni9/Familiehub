@@ -143,6 +143,18 @@ def migrer_handleliste(gammel_liste):
             ny_liste.append(item)
     return ny_liste
 
+def migrer_middagsplan(gammel_plan):
+    ny_plan = {}
+    for dag in DAGER:
+        innslag = gammel_plan.get(dag, "")
+        if isinstance(innslag, dict):
+            ny_plan[dag] = innslag.get("rett", "")
+        elif isinstance(innslag, str):
+            ny_plan[dag] = innslag
+        else:
+            ny_plan[dag] = ""
+    return ny_plan
+
 def standard_data():
     idag_str = datetime.now(TIDSSONE_NORGE).strftime("%Y-%m-%d")
     return {
@@ -166,7 +178,7 @@ def standard_data():
             {"id": str(uuid.uuid4()), "tekst": "Rydde av bordet etter middag", "hvem": FELLES_VALG, "ferdig": False, "stjerner": 1, "fullfort_av": None, "gjentakende": True},
         ],
         "oppskrifter": STANDARD_MIDDAGER,
-        "middagsplan": {dag: {"rett": "", "kokk": "Ingen valgt", "onske": "Ingen"} for dag in DAGER},
+        "middagsplan": {dag: "" for dag in DAGER},
         "handleliste": migrer_handleliste(["Melk", "Brød", "Smør"])
     }
 
@@ -180,6 +192,7 @@ def last_data():
             if "oppskrifter" not in d: d["oppskrifter"] = STANDARD_MIDDAGER
             else: d["oppskrifter"] = migrer_oppskrifter(d["oppskrifter"])
             d["handleliste"] = migrer_handleliste(d.get("handleliste", []))
+            d["middagsplan"] = migrer_middagsplan(d.get("middagsplan", {}))
             return d
     except Exception:
         pass
@@ -230,7 +243,7 @@ def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
     return True
 
 def cb_sett_middag(dag, rett):
-    data["middagsplan"][dag]["rett"] = rett
+    data["middagsplan"][dag] = rett
     lagre_data(data)
     st.session_state[f"rett_{dag}"] = rett
 
@@ -240,7 +253,7 @@ def cb_auto_planlegg(oppskriftsliste):
     else: ukens_trekk = [random.choice(oppskriftsliste) for _ in range(7)]
     for i, dag in enumerate(DAGER):
         ny_rett = ukens_trekk[i]
-        data["middagsplan"][dag]["rett"] = ny_rett
+        data["middagsplan"][dag] = ny_rett
         st.session_state[f"rett_{dag}"] = ny_rett
     lagre_data(data)
 
@@ -250,15 +263,13 @@ def cb_start_ny_uke():
         o["ferdig"] = False
         o["fullfort_av"] = None
     for dag in DAGER:
-        data["middagsplan"][dag] = {"rett": "", "kokk": "Ingen valgt", "onske": "Ingen"}
+        data["middagsplan"][dag] = ""
         st.session_state[f"rett_{dag}"] = ""
-        st.session_state[f"onske_{dag}"] = "Ingen"
-        st.session_state[f"kokk_{dag}"] = "Ingen valgt"
     lagre_data(data)
 
 for dag in DAGER:
     if f"rett_{dag}" not in st.session_state:
-        st.session_state[f"rett_{dag}"] = data["middagsplan"].get(dag, {}).get("rett", "")
+        st.session_state[f"rett_{dag}"] = data["middagsplan"].get(dag, "")
 
 if "foreldremodus" not in st.session_state:
     st.session_state["foreldremodus"] = False
@@ -427,12 +438,11 @@ with fane_oppgaver:
     medlemmer = data.get("medlemmer", [])
     stjerne_brukere = data.get("stjerne_brukere", [])
 
-    # Finn billigste premie som barna kan spare mot
     billigste_premie = None
     if data.get("belonninger"):
         billigste_premie = min(data["belonninger"], key=lambda x: x["pris"])
 
-# VISUELL STJERNETAVLE FOR BARNA ØVERST
+    # VISUELL STJERNETAVLE FOR BARNA ØVERST
     if stjerne_brukere:
         st.markdown("#### 🌟 Familiens Stjernetavle")
         kolonner = st.columns(len(stjerne_brukere))
@@ -630,7 +640,7 @@ with fane_butikk:
                     lagre_data(data)
                     st.rerun()
 
-# ----------------- FANE 3: MIDDAG MED BILDER -----------------
+# ----------------- FANE 3: MIDDAG MED BILDER (UTEN KOKK / ØNSKE) -----------------
 with fane_middag:
     oppskrifter = data.get("oppskrifter", STANDARD_MIDDAGER)
     oppskriftsliste = sorted(list(oppskrifter.keys()))
@@ -649,13 +659,10 @@ with fane_middag:
             st.toast(f"{lagt} ingredienser lagt i handlelisten! 🛒")
 
     st.write("---")
-    kokk_alternativer = ["Ingen valgt"] + data["medlemmer"]
-    onske_alternativer = ["Ingen"] + data["medlemmer"]
     plan_oppdatert = False
 
     for dag in DAGER:
         er_idag = (dag == idag_navn)
-        dag_data = data["middagsplan"].get(dag, {"rett": "", "kokk": "Ingen valgt", "onske": "Ingen"})
         valgt_rett = st.session_state.get(f"rett_{dag}", "")
         tittel_dag = f"👉 **{dag} (I dag)**" if er_idag else f"📅 **{dag}**"
         
@@ -665,19 +672,23 @@ with fane_middag:
                 st.image(oppskrifter[valgt_rett]["bilde"], use_container_width=True)
             
             c_r1, c_r2 = st.columns([0.82, 0.18])
-            ny_rett = c_r1.text_input(f"Rett {dag}", value=valgt_rett, key=f"rett_{dag}", placeholder="Hva skal dere spise?", label_visibility="collapsed")
+            ny_rett = c_r1.text_input(
+                f"Rett {dag}", 
+                value=valgt_rett, 
+                key=f"rett_{dag}", 
+                placeholder="Hva skal dere spise?", 
+                label_visibility="collapsed"
+            )
+            
             if ny_rett in oppskrifter and c_r2.button("🛒", key=f"kjop_dag_{dag}", help=f"Kjøp til {ny_rett}"):
                 for i_navn in oppskrifter[ny_rett].get("ingredienser", []): legg_til_vare_i_data(i_navn)
                 lagre_data(data)
                 st.toast(f"Ingredienser til {ny_rett} lagt til!")
 
-            c_o, c_k = st.columns(2)
-            valgt_onske = c_o.selectbox(f"Ønske {dag}:", onske_alternativer, index=onske_alternativer.index(dag_data.get("onske", "Ingen")) if dag_data.get("onske", "Ingen") in onske_alternativer else 0, key=f"onske_{dag}")
-            valgt_kokk = c_k.selectbox(f"Kokk {dag}:", kokk_alternativer, index=kokk_alternativer.index(dag_data.get("kokk", "Ingen valgt")) if dag_data.get("kokk", "Ingen valgt") in kokk_alternativer else 0, key=f"kokk_{dag}")
-
-            if (ny_rett != dag_data.get("rett", "") or valgt_onske != dag_data.get("onske", "Ingen") or valgt_kokk != dag_data.get("kokk", "Ingen valgt")):
-                data["middagsplan"][dag] = {"rett": ny_rett, "onske": valgt_onske, "kokk": valgt_kokk}
+            if ny_rett != data["middagsplan"].get(dag, ""):
+                data["middagsplan"][dag] = ny_rett
                 plan_oppdatert = True
+            
             st.divider()
 
     if plan_oppdatert: lagre_data(data)
@@ -809,9 +820,6 @@ if er_forelder and fane_familie:
                 for o in data.get("oppgaver", []):
                     if o["hvem"] == gammelt: o["hvem"] = nytt
                     if o.get("fullfort_av") == gammelt: o["fullfort_av"] = nytt
-                for d in DAGER:
-                    if data["middagsplan"][d].get("kokk") == gammelt: data["middagsplan"][d]["kokk"] = nytt
-                    if data["middagsplan"][d].get("onske") == gammelt: data["middagsplan"][d]["onske"] = nytt
                 lagre_data(data)
                 st.rerun()
 
