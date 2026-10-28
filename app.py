@@ -184,7 +184,7 @@ def standard_data():
         "oppgaver": [
             {"id": str(uuid.uuid4()), "tekst": "Pusse tenner morgen & kveld", "hvem": "Barn 1", "ferdig": False, "stjerner": 1, "fullfort_av": None, "gjentakende": True},
             {"id": str(uuid.uuid4()), "tekst": "Pusse tenner morgen & kveld", "hvem": "Barn 2", "ferdig": False, "stjerner": 1, "fullfort_av": None, "gjentakende": True},
-            {"id": str(uuid.uuid4()), "tekst": "Rydde av bordet etter middag", "hvem": FELLES_VALG, "ferdig": False, "stjerner": 1, "fullfort_av": None, "gjentakende": True},
+            {"id": str(uuid.uuid4()), "tekst": "Rydde av bordet etter middag", "hvem": FELLES_VALG, "ferdig": False, "stjerner": 2, "fullfort_av": None, "gjentakende": True},
         ],
         "oppskrifter": STANDARD_MIDDAGER,
         "middagsplan": {dag: "" for dag in DAGER},
@@ -241,7 +241,6 @@ def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
     if not varenavn.strip(): return False
     renset_navn = varenavn.strip()
     
-    # Hvis varen finnes, men er krysset av, vekk den til live igjen
     for v in data["handleliste"]:
         if v["navn"].lower() == renset_navn.lower():
             if v.get("kjopt", False):
@@ -249,7 +248,7 @@ def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
                 if mengde.strip():
                     v["mengde"] = mengde.strip()
                 return True
-            return False  # Allerede uavkrysset i lista
+            return False
     
     valgt_kat = kategori if kategori and kategori in AVDELINGER else gjett_kategori(renset_navn)
     data["handleliste"].append({
@@ -425,6 +424,8 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
             data["beskjeder"] = [b for b in data["beskjeder"] if b["id"] != slett_beskjed_id]
             lagre_data(data)
             st.rerun()
+    else:
+        st.caption("Ingen beskjeder akkurat nå.")
 
     with st.form("form_ny_beskjed", clear_on_submit=True):
         ny_beskjed_tekst = st.text_input("Ny beskjed / lapp:", placeholder="f.eks. Husk gymtøy i morgen!")
@@ -552,41 +553,72 @@ with fane_oppgaver:
                         if er_samler: data["poeng"][person] = max(0, data["poeng"].get(person, 0) - stjerner)
                     oppgaver_oppdatert = True
 
-    # Fellesoppgaver
+    # FELLESOPPGAVER MED FLERVALG OG STJERNEDELING
     felles_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == FELLES_VALG]
     if felles_oppgaver:
         with st.expander(f"🤝 **Fellesoppgaver** ({len(felles_oppgaver)})", expanded=True):
             for oppg in felles_oppgaver:
                 oppg_id = oppg["id"]
                 merke = "🔄 " if oppg.get("gjentakende") else ""
-                tekst_visning = f"{merke}{oppg['tekst']}"
-                if oppg.get("stjerner", 0) > 0: tekst_visning += f" *(+{oppg['stjerner']} ⭐)*"
-                if oppg["ferdig"] and oppg.get("fullfort_av"): tekst_visning += f" — *({oppg['fullfort_av']})*"
+                tot_stjerner = oppg.get("stjerner", 2)
+                tekst_visning = f"{merke}{oppg['tekst']} *(+{tot_stjerner} ⭐)*"
 
-                c_f_chk, c_f_who = st.columns([0.65, 0.35])
+                # Hent ut fullfort_av (støtter bakoverkompatibilitet for streng eller liste)
+                fa_raw = oppg.get("fullfort_av")
+                if isinstance(fa_raw, list):
+                    tidligere_hjelpere = fa_raw
+                elif isinstance(fa_raw, str) and fa_raw:
+                    tidligere_hjelpere = [fa_raw]
+                else:
+                    tidligere_hjelpere = []
+
+                if oppg["ferdig"] and tidligere_hjelpere:
+                    hjelper_tekst = ", ".join(tidligere_hjelpere)
+                    tekst_visning += f" — *(Hjelpere: {hjelper_tekst})*"
+
+                c_f_chk, c_f_who = st.columns([0.55, 0.45])
                 er_ferdig = c_f_chk.checkbox(tekst_visning, value=oppg["ferdig"], key=f"f_chk_{oppg_id}")
+                
                 if not oppg["ferdig"]:
-                    hvem_valg = c_f_who.selectbox("Hvem?", medlemmer, key=f"f_who_{oppg_id}", label_visibility="collapsed")
+                    valgte_hjelpere = c_f_who.multiselect(
+                        "Hvem hjalp til?",
+                        options=medlemmer,
+                        default=[medlemmer[0]] if medlemmer else [],
+                        key=f"f_who_{oppg_id}",
+                        label_visibility="collapsed"
+                    )
                 else:
                     c_f_who.write("")
-                    hvem_valg = oppg.get("fullfort_av", medlemmer[0] if medlemmer else "")
+                    valgte_hjelpere = tidligere_hjelpere
 
                 if er_forelder and st.button("Slett fellesoppgave ✕", key=f"f_del_{oppg_id}"):
                     slett_id = oppg_id
 
                 if er_ferdig != oppg["ferdig"]:
                     oppg["ferdig"] = er_ferdig
-                    stjerner = oppg.get("stjerner", 0)
+                    
                     if er_ferdig:
-                        oppg["fullfort_av"] = hvem_valg
-                        if hvem_valg in stjerne_brukere:
-                            data["poeng"][hvem_valg] = data["poeng"].get(hvem_valg, 0) + stjerner
-                            st.balloons()
+                        hjelpere_aa_belonne = valgte_hjelpere if valgte_hjelpere else ([medlemmer[0]] if medlemmer else [])
+                        oppg["fullfort_av"] = hjelpere_aa_belonne
+                        antall_hjelpere = max(1, len(hjelpere_aa_belonne))
+                        # Del stjerner (minst 1 ⭐ per person som deltar)
+                        stjerner_hver = max(1, round(tot_stjerner / antall_hjelpere))
+                        
+                        for h in hjelpere_aa_belonne:
+                            if h in stjerne_brukere:
+                                data["poeng"][h] = data["poeng"].get(h, 0) + stjerner_hver
+                        
+                        st.balloons()
+                        st.toast(f"🎉 Fantastisk samarbeid! +{stjerner_hver} ⭐ til hver.")
                     else:
-                        gammel = oppg.get("fullfort_av")
-                        if gammel in stjerne_brukere:
-                            data["poeng"][gammel] = max(0, data["poeng"].get(gammel, 0) - stjerner)
+                        gamle_hjelpere = tidligere_hjelpere
+                        antall_for = max(1, len(gamle_hjelpere))
+                        trekk_hver = max(1, round(tot_stjerner / antall_for))
+                        for h in gamle_hjelpere:
+                            if h in stjerne_brukere:
+                                data["poeng"][h] = max(0, data["poeng"].get(h, 0) - trekk_hver)
                         oppg["fullfort_av"] = None
+
                     oppgaver_oppdatert = True
 
     if slett_id:
@@ -604,7 +636,7 @@ with fane_oppgaver:
             with st.form("form_ny_oppg", clear_on_submit=True):
                 oppg_tekst = st.text_input("Gjøremål:")
                 valgte = st.multiselect("Til hvem?", [FELLES_VALG] + medlemmer, default=[medlemmer[0]] if medlemmer else [])
-                stjerner = st.number_input("Stjerner:", min_value=0, max_value=20, value=1)
+                stjerner = st.number_input("Stjerner (ved fellesoppgaver deles disse på hjelperne):", min_value=1, max_value=20, value=2)
                 er_daglig = st.checkbox("🔄 Daglig rutine", value=True)
                 if st.form_submit_button("Lagre oppgave", use_container_width=True) and oppg_tekst.strip() and valgte:
                     for p in valgte:
@@ -761,7 +793,7 @@ with fane_middag:
                     st.toast(f"{ny_r.strip()} er lagt til!")
                     st.rerun()
 
-# ----------------- FANE 4: HANDLELISTE MED DYNAMISKE HURTIGKNAPPER -----------------
+# ----------------- FANE 4: HANDLELISTE MED HURTIGVALG -----------------
 with fane_handleliste:
     st.subheader("🛒 Handleliste")
 
@@ -863,7 +895,10 @@ if er_forelder and fane_familie:
                 if gammelt in data.get("poeng", {}): data["poeng"][nytt] = data["poeng"].pop(gammelt)
                 for o in data.get("oppgaver", []):
                     if o["hvem"] == gammelt: o["hvem"] = nytt
-                    if o.get("fullfort_av") == gammelt: o["fullfort_av"] = nytt
+                    if isinstance(o.get("fullfort_av"), list):
+                        o["fullfort_av"] = [nytt if x == gammelt else x for x in o["fullfort_av"]]
+                    elif o.get("fullfort_av") == gammelt:
+                        o["fullfort_av"] = nytt
                 lagre_data(data)
                 st.rerun()
 
