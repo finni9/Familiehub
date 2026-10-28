@@ -1,15 +1,15 @@
 import streamlit as st
 import json
-import os
 import random
 import uuid
 import base64
 import io
+import pandas as pd
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
 from PIL import Image
+from streamlit_gsheets import GSheetsConnection
 
-DATA_FIL = "familie_data.json"
 TIDSSONE_NORGE = ZoneInfo("Europe/Oslo")
 
 STANDARD_MIDDAGER = {
@@ -89,8 +89,10 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
+# Koble til Google Sheets
+conn = st.connection("gsheets", type=GSheetsConnection)
+
 def bilde_til_base64(opplastet_fil):
-    """Komprimerer bildet til maks 600px bredde og gjør det om til en Base64-streng"""
     try:
         bilde = Image.open(opplastet_fil)
         bilde = bilde.convert("RGB")
@@ -118,10 +120,8 @@ def migrer_oppskrifter(gamle_oppskrifter):
         if isinstance(val, list):
             nye[tittel] = {"ingredienser": val, "bilde": None}
         elif isinstance(val, dict):
-            if "ingredienser" not in val:
-                val["ingredienser"] = []
-            if "bilde" not in val:
-                val["bilde"] = None
+            if "ingredienser" not in val: val["ingredienser"] = []
+            if "bilde" not in val: val["bilde"] = None
             nye[tittel] = val
     return nye
 
@@ -137,67 +137,15 @@ def migrer_handleliste(gammel_liste):
                 "kjopt": False
             })
         elif isinstance(item, dict):
-            if "id" not in item:
-                item["id"] = str(uuid.uuid4())
-            if "mengde" not in item:
-                item["mengde"] = ""
-            if "kategori" not in item:
-                item["kategori"] = gjett_kategori(item.get("navn", ""))
-            if "kjopt" not in item:
-                item["kjopt"] = False
+            if "id" not in item: item["id"] = str(uuid.uuid4())
+            if "mengde" not in item: item["mengde"] = ""
+            if "kategori" not in item: item["kategori"] = gjett_kategori(item.get("navn", ""))
+            if "kjopt" not in item: item["kjopt"] = False
             ny_liste.append(item)
     return ny_liste
 
-def last_data():
+def standard_data():
     idag_str = datetime.now(TIDSSONE_NORGE).strftime("%Y-%m-%d")
-    if os.path.exists(DATA_FIL):
-        try:
-            with open(DATA_FIL, "r", encoding="utf-8") as f:
-                d = json.load(f)
-                if "pin" not in d:
-                    d["pin"] = "1234"
-                if "sist_nullstilt" not in d:
-                    d["sist_nullstilt"] = idag_str
-                if "medlemmer" not in d:
-                    d["medlemmer"] = ["Far", "Mor", "Barn 1", "Barn 2"]
-                if "stjerne_brukere" not in d:
-                    d["stjerne_brukere"] = ["Barn 1", "Barn 2", "Far", "Mor"]
-                if "poeng" not in d:
-                    d["poeng"] = {m: 0 for m in d["medlemmer"]}
-                if "beskjeder" not in d:
-                    d["beskjeder"] = [
-                        {"id": str(uuid.uuid4()), "tekst": "Husk gymtøy i morgen! 🏃‍♂️", "fra": "Mor", "tid": "Kl. 08:00"}
-                    ]
-                if "merkedager" not in d:
-                    d["merkedager"] = []
-                if "belonninger" not in d:
-                    d["belonninger"] = [
-                        {"id": str(uuid.uuid4()), "tittel": "30 min ekstra skjermtid", "pris": 5},
-                        {"id": str(uuid.uuid4()), "tittel": "Velge lørdagsgodt", "pris": 8},
-                        {"id": str(uuid.uuid4()), "tittel": "Bestemme lørdagsfilm", "pris": 10}
-                    ]
-                if "oppskrifter" not in d:
-                    d["oppskrifter"] = STANDARD_MIDDAGER
-                else:
-                    d["oppskrifter"] = migrer_oppskrifter(d["oppskrifter"])
-                if "middagsplan" not in d:
-                    gamle_middager = d.get("middager", {})
-                    d["middagsplan"] = {
-                        dag: {"rett": gamle_middager.get(dag, ""), "kokk": "Ingen valgt", "onske": "Ingen"} 
-                        for dag in DAGER
-                    }
-                for oppg in d.get("oppgaver", []):
-                    if "id" not in oppg:
-                        oppg["id"] = str(uuid.uuid4())
-                    if "fullfort_av" not in oppg:
-                        oppg["fullfort_av"] = None
-                    if "gjentakende" not in oppg:
-                        oppg["gjentakende"] = False
-                d["handleliste"] = migrer_handleliste(d.get("handleliste", []))
-                return d
-        except Exception:
-            pass
-
     return {
         "pin": "1234",
         "sist_nullstilt": idag_str,
@@ -223,9 +171,30 @@ def last_data():
         "handleliste": migrer_handleliste(["Melk", "Brød", "Smør"])
     }
 
+def last_data():
+    try:
+        df = conn.read(ttl=0)
+        if not df.empty and "data_dump" in df.columns:
+            json_tekst = str(df["data_dump"].iloc[0])
+            d = json.loads(json_tekst)
+            if "merkedager" not in d: d["merkedager"] = []
+            if "oppskrifter" not in d: d["oppskrifter"] = STANDARD_MIDDAGER
+            else: d["oppskrifter"] = migrer_oppskrifter(d["oppskrifter"])
+            d["handleliste"] = migrer_handleliste(d.get("handleliste", []))
+            return d
+    except Exception:
+        pass
+    d = standard_data()
+    lagre_data(d)
+    return d
+
 def lagre_data(data):
-    with open(DATA_FIL, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        json_tekst = json.dumps(data, ensure_ascii=False)
+        df = pd.DataFrame([{"data_dump": json_tekst}])
+        conn.update(data=df)
+    except Exception as e:
+        st.error(f"Kunne ikke lagre til Google Sheets: {e}")
 
 data = last_data()
 
@@ -238,7 +207,6 @@ if data.get("sist_nullstilt") != idag_str:
         if o.get("gjentakende", False):
             o["ferdig"] = False
             o["fullfort_av"] = None
-    # Fjern merkedager som er passert
     data["merkedager"] = [
         m for m in data.get("merkedager", [])
         if datetime.strptime(m["dato"], "%Y-%m-%d").date() >= idag_dato
@@ -247,12 +215,10 @@ if data.get("sist_nullstilt") != idag_str:
     lagre_data(data)
 
 def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
-    if not varenavn.strip():
-        return False
+    if not varenavn.strip(): return False
     renset_navn = varenavn.strip()
     eksisterende = [v["navn"].lower() for v in data["handleliste"]]
-    if renset_navn.lower() in eksisterende:
-        return False
+    if renset_navn.lower() in eksisterende: return False
     
     valgt_kat = kategori if kategori and kategori in AVDELINGER else gjett_kategori(renset_navn)
     data["handleliste"].append({
@@ -270,12 +236,9 @@ def cb_sett_middag(dag, rett):
     st.session_state[f"rett_{dag}"] = rett
 
 def cb_auto_planlegg(oppskriftsliste):
-    if not oppskriftsliste:
-        return
-    if len(oppskriftsliste) >= 7:
-        ukens_trekk = random.sample(oppskriftsliste, 7)
-    else:
-        ukens_trekk = [random.choice(oppskriftsliste) for _ in range(7)]
+    if not oppskriftsliste: return
+    if len(oppskriftsliste) >= 7: ukens_trekk = random.sample(oppskriftsliste, 7)
+    else: ukens_trekk = [random.choice(oppskriftsliste) for _ in range(7)]
     for i, dag in enumerate(DAGER):
         ny_rett = ukens_trekk[i]
         data["middagsplan"][dag]["rett"] = ny_rett
@@ -283,10 +246,7 @@ def cb_auto_planlegg(oppskriftsliste):
     lagre_data(data)
 
 def cb_start_ny_uke():
-    data["oppgaver"] = [
-        o for o in data["oppgaver"] 
-        if o.get("gjentakende", False) or not o["ferdig"]
-    ]
+    data["oppgaver"] = [o for o in data["oppgaver"] if o.get("gjentakende", False) or not o["ferdig"]]
     for o in data["oppgaver"]:
         o["ferdig"] = False
         o["fullfort_av"] = None
@@ -306,7 +266,7 @@ if "foreldremodus" not in st.session_state:
 
 st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
 
-# ----------------- SIDEPANEL: FORELDREKONTROLL -----------------
+# ----------------- FORELDREKONTROLL -----------------
 with st.sidebar:
     st.header("🔐 Foreldrekontroll")
     if st.session_state["foreldremodus"]:
@@ -332,7 +292,7 @@ with st.sidebar:
             else:
                 st.error("Feil PIN-kode!")
 
-# ----------------- MOBIL TOPPSTRIPE & MERKEDAGER / KALENDER -----------------
+# ----------------- TOPPSTRIPE & KALENDER -----------------
 naa = datetime.now(TIDSSONE_NORGE)
 dag_indeks = naa.weekday()
 idag_navn = DAGER[dag_indeks]
@@ -356,7 +316,6 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager (Trykk her)**", expa
     slett_merkedag_id = None
     
     if merkedager:
-        # Sorter kronologisk
         merkedager_sortert = sorted(merkedager, key=lambda x: x["dato"])
         for m in merkedager_sortert:
             m_dato = datetime.strptime(m["dato"], "%Y-%m-%d").date()
@@ -364,16 +323,13 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager (Trykk her)**", expa
             
             if dager_igjen == 0:
                 nedtelling = "🎉 I DAG!"
-                bg_farge = "#D1FAE5"
-                kant_farge = "#10B981"
+                bg_farge, kant_farge = "#D1FAE5", "#10B981"
             elif dager_igjen == 1:
                 nedtelling = "⏰ I morgen!"
-                bg_farge = "#FEF3C7"
-                kant_farge = "#F59E0B"
+                bg_farge, kant_farge = "#FEF3C7", "#F59E0B"
             else:
                 nedtelling = f"⏳ Om {dager_igjen} dager"
-                bg_farge = "#F0FDF4"
-                kant_farge = "#3B82F6"
+                bg_farge, kant_farge = "#F0FDF4", "#3B82F6"
 
             c_info, c_slett = st.columns([0.84, 0.16])
             with c_info:
@@ -387,7 +343,7 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager (Trykk her)**", expa
                     unsafe_allow_html=True
                 )
             with c_slett:
-                if st.button("✕", key=f"del_m_{m['id']}", help="Fjern hendelse"):
+                if st.button("✕", key=f"del_m_{m['id']}", help="Fjern"):
                     slett_merkedag_id = m["id"]
 
         if slett_merkedag_id:
@@ -395,29 +351,27 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager (Trykk her)**", expa
             lagre_data(data)
             st.rerun()
     else:
-        st.caption("Ingen merkedager lagt inn. Legg inn bursdager, skoleturer eller ferier under!")
+        st.caption("Ingen merkedager lagt inn.")
 
     st.write("---")
     with st.form("form_ny_merkedag", clear_on_submit=True):
-        st.markdown("##### ➕ Legg til merkedag / påminnelse")
-        m_tittel = st.text_input("Hva skal skje?", placeholder="f.eks. Bursdag, Sommerferie, Tannlege")
+        m_tittel = st.text_input("Hva skal skje?", placeholder="f.eks. Bursdag, Ferie, Tannlege")
         col_d, col_i = st.columns([0.65, 0.35])
         m_dato_valg = col_d.date_input("Dato:", min_value=idag_dato, value=idag_dato)
         m_ikon = col_i.selectbox("Type:", ["🎂 Bursdag", "✈️ Ferie/Tur", "🦷 Tannlege/Lege", "🎒 Skole/Barnehage", "📌 Annet"])
         
         if st.form_submit_button("Lagre i kalenderen", use_container_width=True) and m_tittel.strip():
-            rent_ikon = m_ikon.split()[0]
             data["merkedager"].append({
                 "id": str(uuid.uuid4()),
                 "tittel": m_tittel.strip(),
                 "dato": m_dato_valg.strftime("%Y-%m-%d"),
-                "ikon": rent_ikon
+                "ikon": m_ikon.split()[0]
             })
             lagre_data(data)
             st.toast("Merkedag lagret!")
             st.rerun()
 
-# ----------------- OPPKOPLING TIL OPPSTAVLE -----------------
+# ----------------- OPPSTAVLE -----------------
 with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
     beskjeder = data.get("beskjeder", [])
     slett_beskjed_id = None
@@ -442,16 +396,12 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
             data["beskjeder"] = [b for b in data["beskjeder"] if b["id"] != slett_beskjed_id]
             lagre_data(data)
             st.rerun()
-    else:
-        st.caption("Ingen beskjeder akkurat nå.")
 
     with st.form("form_ny_beskjed", clear_on_submit=True):
         ny_beskjed_tekst = st.text_input("Ny beskjed / lapp:", placeholder="f.eks. Husk gymtøy i morgen!")
         c_fra, c_knapp = st.columns([0.6, 0.4])
         hvem_fra = c_fra.selectbox("Fra:", data.get("medlemmer", ["Mor", "Far"]))
-        post_knapp = c_knapp.form_submit_button("Heng opp 📌", use_container_width=True)
-
-        if post_knapp and ny_beskjed_tekst.strip():
+        if c_knapp.form_submit_button("Heng opp 📌", use_container_width=True) and ny_beskjed_tekst.strip():
             tidspunkt = naa.strftime("%d.%m kl. %H:%M")
             data["beskjeder"].append({
                 "id": str(uuid.uuid4()),
@@ -464,23 +414,14 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
 
 er_forelder = st.session_state["foreldremodus"]
 
-fane_navn = [
-    "⭐ Oppgaver", 
-    "🎁 Butikk", 
-    "🍽️ Middag", 
-    "🛒 Handleliste"
-]
-if er_forelder:
-    fane_navn.append("👨‍👩‍👧‍👦 Admin")
+fane_navn = ["⭐ Oppgaver", "🎁 Butikk", "🍽️ Middag", "🛒 Handleliste"]
+if er_forelder: fane_navn.append("👨‍👩‍👧‍👦 Admin")
 
 faner = st.tabs(fane_navn)
-fane_oppgaver = faner[0]
-fane_butikk = faner[1]
-fane_middag = faner[2]
-fane_handleliste = faner[3]
+fane_oppgaver, fane_butikk, fane_middag, fane_handleliste = faner[0], faner[1], faner[2], faner[3]
 fane_familie = faner[4] if er_forelder else None
 
-# ----------------- FANE 1: OPPGAVER & RUTINER -----------------
+# ----------------- FANE 1: OPPGAVER -----------------
 with fane_oppgaver:
     oppgaver_oppdatert = False
     slett_id = None
@@ -504,7 +445,6 @@ with fane_oppgaver:
             st.caption("🔒 Ny uke krever PIN")
 
     st.write("")
-
     for person in medlemmer:
         er_samler = person in stjerne_brukere
         poeng_tekst = f" • {data['poeng'].get(person, 0)} ⭐" if er_samler else ""
@@ -513,21 +453,16 @@ with fane_oppgaver:
         status_tekst = f"({gjenstaende} igjen)" if gjenstaende > 0 else "(Alt fullført! 🎉)"
 
         with st.expander(f"👤 **{person}**{poeng_tekst} {status_tekst}", expanded=(gjenstaende > 0)):
-            if not person_oppgaver:
-                st.caption("Ingen oppgaver akkurat nå 🎉")
-
             for oppg in person_oppgaver:
                 oppg_id = oppg["id"]
                 merke = "🔄 " if oppg.get("gjentakende") else ""
                 tekst_visning = f"{merke}{oppg['tekst']}"
-                if oppg.get("stjerner", 0) > 0:
-                    tekst_visning += f" *(+{oppg['stjerner']} ⭐)*"
+                if oppg.get("stjerner", 0) > 0: tekst_visning += f" *(+{oppg['stjerner']} ⭐)*"
 
                 if er_forelder:
                     c_chk, c_del = st.columns([0.85, 0.15])
                     er_ferdig = c_chk.checkbox(tekst_visning, value=oppg["ferdig"], key=f"chk_{oppg_id}")
-                    if c_del.button("✕", key=f"del_{oppg_id}", help="Slett"):
-                        slett_id = oppg_id
+                    if c_del.button("✕", key=f"del_{oppg_id}", help="Slett"): slett_id = oppg_id
                 else:
                     er_ferdig = st.checkbox(tekst_visning, value=oppg["ferdig"], key=f"chk_{oppg_id}")
 
@@ -539,8 +474,7 @@ with fane_oppgaver:
                             data["poeng"][person] = data["poeng"].get(person, 0) + stjerner
                             st.balloons()
                     else:
-                        if er_samler:
-                            data["poeng"][person] = max(0, data["poeng"].get(person, 0) - stjerner)
+                        if er_samler: data["poeng"][person] = max(0, data["poeng"].get(person, 0) - stjerner)
                     oppgaver_oppdatert = True
 
     # Fellesoppgaver
@@ -551,25 +485,19 @@ with fane_oppgaver:
                 oppg_id = oppg["id"]
                 merke = "🔄 " if oppg.get("gjentakende") else ""
                 tekst_visning = f"{merke}{oppg['tekst']}"
-                if oppg.get("stjerner", 0) > 0:
-                    tekst_visning += f" *(+{oppg['stjerner']} ⭐)*"
-                if oppg["ferdig"] and oppg.get("fullfort_av"):
-                    tekst_visning += f" — *({oppg['fullfort_av']})*"
+                if oppg.get("stjerner", 0) > 0: tekst_visning += f" *(+{oppg['stjerner']} ⭐)*"
+                if oppg["ferdig"] and oppg.get("fullfort_av"): tekst_visning += f" — *({oppg['fullfort_av']})*"
 
                 c_f_chk, c_f_who = st.columns([0.65, 0.35])
                 er_ferdig = c_f_chk.checkbox(tekst_visning, value=oppg["ferdig"], key=f"f_chk_{oppg_id}")
-                
                 if not oppg["ferdig"]:
-                    hvem_valg = c_f_who.selectbox(
-                        "Hvem?", medlemmer, key=f"f_who_{oppg_id}", label_visibility="collapsed"
-                    )
+                    hvem_valg = c_f_who.selectbox("Hvem?", medlemmer, key=f"f_who_{oppg_id}", label_visibility="collapsed")
                 else:
                     c_f_who.write("")
                     hvem_valg = oppg.get("fullfort_av", medlemmer[0] if medlemmer else "")
 
-                if er_forelder:
-                    if st.button("Slett denne fellesoppgaven ✕", key=f"f_del_{oppg_id}"):
-                        slett_id = oppg_id
+                if er_forelder and st.button("Slett fellesoppgave ✕", key=f"f_del_{oppg_id}"):
+                    slett_id = oppg_id
 
                 if er_ferdig != oppg["ferdig"]:
                     oppg["ferdig"] = er_ferdig
@@ -603,26 +531,19 @@ with fane_oppgaver:
                 valgte = st.multiselect("Til hvem?", [FELLES_VALG] + medlemmer, default=[medlemmer[0]] if medlemmer else [])
                 stjerner = st.number_input("Stjerner:", min_value=0, max_value=20, value=1)
                 er_daglig = st.checkbox("🔄 Daglig rutine", value=True)
-                if st.form_submit_button("Lagre oppgave", use_container_width=True):
-                    if oppg_tekst.strip() and valgte:
-                        for p in valgte:
-                            data["oppgaver"].append({
-                                "id": str(uuid.uuid4()),
-                                "tekst": oppg_tekst.strip(),
-                                "hvem": p,
-                                "ferdig": False,
-                                "stjerner": int(stjerner),
-                                "fullfort_av": None,
-                                "gjentakende": er_daglig
-                            })
-                        lagre_data(data)
-                        st.toast("Oppgave lagt til!")
-                        st.rerun()
+                if st.form_submit_button("Lagre oppgave", use_container_width=True) and oppg_tekst.strip() and valgte:
+                    for p in valgte:
+                        data["oppgaver"].append({
+                            "id": str(uuid.uuid4()), "tekst": oppg_tekst.strip(), "hvem": p,
+                            "ferdig": False, "stjerner": int(stjerner), "fullfort_av": None, "gjentakende": er_daglig
+                        })
+                    lagre_data(data)
+                    st.toast("Oppgave lagt til!")
+                    st.rerun()
 
-# ----------------- FANE 2: BELØNNINGSBUTIKK -----------------
+# ----------------- FANE 2: BUTIKK -----------------
 with fane_butikk:
     st.subheader("🎁 Belønningsbutikk")
-    
     stjerne_brukere = data.get("stjerne_brukere", [])
     if stjerne_brukere:
         saldo_tekst = " | ".join([f"**{p}:** {data['poeng'].get(p, 0)} ⭐" for p in stjerne_brukere])
@@ -643,9 +564,8 @@ with fane_butikk:
                 st.toast(f"🎉 Gratulerer {hvem_kjoper}!")
                 st.rerun()
 
-        if er_forelder:
-            if st.button("Slett premie ✕", key=f"del_bel_{bel['id']}"):
-                slett_belonning_id = bel["id"]
+        if er_forelder and st.button("Slett premie ✕", key=f"del_bel_{bel['id']}"):
+            slett_belonning_id = bel["id"]
         st.divider()
 
     if slett_belonning_id:
@@ -659,32 +579,25 @@ with fane_butikk:
                 b_tittel = st.text_input("Premienavn:")
                 b_pris = st.number_input("Pris i stjerner:", min_value=1, max_value=100, value=5)
                 if st.form_submit_button("Lagre premie", use_container_width=True) and b_tittel.strip():
-                    data["belonninger"].append({
-                        "id": str(uuid.uuid4()),
-                        "tittel": b_tittel.strip(),
-                        "pris": int(b_pris)
-                    })
+                    data["belonninger"].append({"id": str(uuid.uuid4()), "tittel": b_tittel.strip(), "pris": int(b_pris)})
                     lagre_data(data)
                     st.rerun()
 
-# ----------------- FANE 3: MIDDAGSPLAN MED BILDEVISNING -----------------
+# ----------------- FANE 3: MIDDAG MED BILDER -----------------
 with fane_middag:
     oppskrifter = data.get("oppskrifter", STANDARD_MIDDAGER)
     oppskriftsliste = sorted(list(oppskrifter.keys()))
 
     c_m1, c_m2 = st.columns(2)
-    with c_m1:
-        st.button("✨ Auto-planlegg uken", on_click=cb_auto_planlegg, args=(oppskriftsliste,), use_container_width=True)
+    with c_m1: st.button("✨ Auto-planlegg uken", on_click=cb_auto_planlegg, args=(oppskriftsliste,), use_container_width=True)
     with c_m2:
         if st.button("🛒 Middager til handleliste", use_container_width=True):
             lagt = 0
             for d in DAGER:
                 rett = st.session_state.get(f"rett_{d}", "").strip()
                 if rett in oppskrifter:
-                    ingr = oppskrifter[rett].get("ingredienser", [])
-                    for i_navn in ingr:
-                        if legg_til_vare_i_data(i_navn):
-                            lagt += 1
+                    for i_navn in oppskrifter[rett].get("ingredienser", []):
+                        if legg_til_vare_i_data(i_navn): lagt += 1
             lagre_data(data)
             st.toast(f"{lagt} ingredienser lagt i handlelisten! 🛒")
 
@@ -697,64 +610,31 @@ with fane_middag:
         er_idag = (dag == idag_navn)
         dag_data = data["middagsplan"].get(dag, {"rett": "", "kokk": "Ingen valgt", "onske": "Ingen"})
         valgt_rett = st.session_state.get(f"rett_{dag}", "")
-        
         tittel_dag = f"👉 **{dag} (I dag)**" if er_idag else f"📅 **{dag}**"
         
         with st.container():
             st.markdown(f"#### {tittel_dag}")
-
-            # Vis bilde av valgt middag dersom tilgjengelig
             if valgt_rett in oppskrifter and oppskrifter[valgt_rett].get("bilde"):
                 st.image(oppskrifter[valgt_rett]["bilde"], use_container_width=True)
             
             c_r1, c_r2 = st.columns([0.82, 0.18])
-            ny_rett = c_r1.text_input(
-                f"Rett {dag}", 
-                value=valgt_rett,
-                key=f"rett_{dag}", 
-                placeholder="Hva skal dere spise?", 
-                label_visibility="collapsed"
-            )
-            
-            if ny_rett in oppskrifter:
-                if c_r2.button("🛒", key=f"kjop_dag_{dag}", help=f"Kjøp til {ny_rett}"):
-                    for i_navn in oppskrifter[ny_rett].get("ingredienser", []):
-                        legg_til_vare_i_data(i_navn)
-                    lagre_data(data)
-                    st.toast(f"Ingredienser til {ny_rett} lagt til!")
-            else:
-                c_r2.write("")
+            ny_rett = c_r1.text_input(f"Rett {dag}", value=valgt_rett, key=f"rett_{dag}", placeholder="Hva skal dere spise?", label_visibility="collapsed")
+            if ny_rett in oppskrifter and c_r2.button("🛒", key=f"kjop_dag_{dag}", help=f"Kjøp til {ny_rett}"):
+                for i_navn in oppskrifter[ny_rett].get("ingredienser", []): legg_til_vare_i_data(i_navn)
+                lagre_data(data)
+                st.toast(f"Ingredienser til {ny_rett} lagt til!")
 
             c_o, c_k = st.columns(2)
-            valgt_onske = c_o.selectbox(
-                f"Ønske {dag}:", 
-                onske_alternativer,
-                index=onske_alternativer.index(dag_data.get("onske", "Ingen")) if dag_data.get("onske", "Ingen") in onske_alternativer else 0,
-                key=f"onske_{dag}"
-            )
-            valgt_kokk = c_k.selectbox(
-                f"Kokk {dag}:", 
-                kokk_alternativer,
-                index=kokk_alternativer.index(dag_data.get("kokk", "Ingen valgt")) if dag_data.get("kokk", "Ingen valgt") in kokk_alternativer else 0,
-                key=f"kokk_{dag}"
-            )
+            valgt_onske = c_o.selectbox(f"Ønske {dag}:", onske_alternativer, index=onske_alternativer.index(dag_data.get("onske", "Ingen")) if dag_data.get("onske", "Ingen") in onske_alternativer else 0, key=f"onske_{dag}")
+            valgt_kokk = c_k.selectbox(f"Kokk {dag}:", kokk_alternativer, index=kokk_alternativer.index(dag_data.get("kokk", "Ingen valgt")) if dag_data.get("kokk", "Ingen valgt") in kokk_alternativer else 0, key=f"kokk_{dag}")
 
-            if (ny_rett != dag_data.get("rett", "") or 
-                valgt_onske != dag_data.get("onske", "Ingen") or 
-                valgt_kokk != dag_data.get("kokk", "Ingen valgt")):
-                data["middagsplan"][dag] = {
-                    "rett": ny_rett,
-                    "onske": valgt_onske,
-                    "kokk": valgt_kokk
-                }
+            if (ny_rett != dag_data.get("rett", "") or valgt_onske != dag_data.get("onske", "Ingen") or valgt_kokk != dag_data.get("kokk", "Ingen valgt")):
+                data["middagsplan"][dag] = {"rett": ny_rett, "onske": valgt_onske, "kokk": valgt_kokk}
                 plan_oppdatert = True
-            
             st.divider()
 
-    if plan_oppdatert:
-        lagre_data(data)
+    if plan_oppdatert: lagre_data(data)
 
-    # Oppskriftsbok med visuelle bildekort
     with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
         for tittel, info in sorted(oppskrifter.items()):
@@ -762,10 +642,8 @@ with fane_middag:
             bilde_url = info.get("bilde")
             
             st.markdown(f"### 🍽️ {tittel}")
-            if bilde_url:
-                st.image(bilde_url, use_container_width=True)
-            else:
-                st.info("📷 Ingen bilde lagt til enda.")
+            if bilde_url: st.image(bilde_url, use_container_width=True)
+            else: st.info("📷 Ingen bilde lagt til enda.")
 
             st.caption(f"Ingredienser: {', '.join(ingr_liste)}" if ingr_liste else "Ingen ingredienser lagt inn")
             
@@ -773,25 +651,18 @@ with fane_middag:
             valgt_dag = c_d.selectbox(f"Dag for {tittel}", DAGER, key=f"v_dag_{tittel}", label_visibility="collapsed")
             c_s.button("Sett på meny 📅", key=f"s_meny_{tittel}", on_click=cb_sett_middag, args=(valgt_dag, tittel), use_container_width=True)
             
-            # Legg til eller endre bilde for retten
             with st.expander(f"📸 Endre / Legg til bilde for {tittel}"):
-                nytt_bilde_fil = st.file_uploader(
-                    f"Last opp eller ta bilde av {tittel}:", 
-                    type=["png", "jpg", "jpeg"], 
-                    key=f"file_{tittel}"
-                )
-                if st.button("Lagre bilde 💾", key=f"btn_bilde_{tittel}"):
-                    if nytt_bilde_fil:
-                        b64 = bilde_til_base64(nytt_bilde_fil)
-                        if b64:
-                            oppskrifter[tittel]["bilde"] = b64
-                            lagre_data(data)
-                            st.toast(f"Bilde lagret for {tittel}!")
-                            st.rerun()
+                nytt_bilde_fil = st.file_uploader(f"Last opp eller knips bilde av {tittel}:", type=["png", "jpg", "jpeg"], key=f"file_{tittel}")
+                if st.button("Lagre bilde 💾", key=f"btn_bilde_{tittel}") and nytt_bilde_fil:
+                    b64 = bilde_til_base64(nytt_bilde_fil)
+                    if b64:
+                        oppskrifter[tittel]["bilde"] = b64
+                        lagre_data(data)
+                        st.toast(f"Bilde lagret for {tittel}!")
+                        st.rerun()
 
-            if er_forelder:
-                if st.button("Slett oppskrift ✕", key=f"del_op_{tittel}"):
-                    slett_oppskrift = tittel
+            if er_forelder and st.button("Slett oppskrift ✕", key=f"del_op_{tittel}"):
+                slett_oppskrift = tittel
             st.divider()
 
         if slett_oppskrift:
@@ -809,15 +680,12 @@ with fane_middag:
                 if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
-                    data["oppskrifter"][ny_r.strip()] = {
-                        "ingredienser": ingr_liste_ren,
-                        "bilde": b64_str
-                    }
+                    data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
                     lagre_data(data)
                     st.toast(f"{ny_r.strip()} er lagt til!")
                     st.rerun()
 
-# ----------------- FANE 4: SMART HANDLELISTE (MENGDE & BUNNSORTERING) -----------------
+# ----------------- FANE 4: HANDLELISTE -----------------
 with fane_handleliste:
     st.subheader("🛒 Handleliste")
 
@@ -843,25 +711,15 @@ with fane_handleliste:
             varer_i_avd = [v for v in data["handleliste"] if v.get("kategori") == avd]
             if varer_i_avd:
                 st.markdown(f"##### {avd} ({len(varer_i_avd)})")
-                
-                # SMART SORTERING: Uavkrysset øverst, avkryssede nederst!
                 varer_sortert = sorted(varer_i_avd, key=lambda x: 1 if x.get("kjopt", False) else 0)
                 
                 for v in varer_sortert:
                     v_id = v["id"]
                     er_kjopt = v.get("kjopt", False)
                     mengde_tekst = f" `({v['mengde']})`" if v.get("mengde") else ""
+                    visningstekst = f"~~{v['navn']}{mengde_tekst}~~" if er_kjopt else f"**{v['navn']}**{mengde_tekst}"
 
-                    if er_kjopt:
-                        visningstekst = f"~~{v['navn']}{mengde_tekst}~~"
-                    else:
-                        visningstekst = f"**{v['navn']}**{mengde_tekst}"
-
-                    ny_status = st.checkbox(
-                        visningstekst, 
-                        value=er_kjopt, 
-                        key=f"hl_chk_{v_id}"
-                    )
+                    ny_status = st.checkbox(visningstekst, value=er_kjopt, key=f"hl_chk_{v_id}")
                     if ny_status != er_kjopt:
                         v["kjopt"] = ny_status
                         handleliste_oppdatert = True
@@ -873,14 +731,12 @@ with fane_handleliste:
             st.rerun()
 
         st.divider()
-
         antall_kjopte = len([v for v in data["handleliste"] if v.get("kjopt", False)])
-        if antall_kjopte > 0:
-            if st.button(f"🧹 Fjern {antall_kjopte} avkryssede varer", use_container_width=True):
-                data["handleliste"] = [v for v in data["handleliste"] if not v.get("kjopt", False)]
-                lagre_data(data)
-                st.toast("Avkryssede varer er fjernet!")
-                st.rerun()
+        if antall_kjopte > 0 and st.button(f"🧹 Fjern {antall_kjopte} avkryssede varer", use_container_width=True):
+            data["handleliste"] = [v for v in data["handleliste"] if not v.get("kjopt", False)]
+            lagre_data(data)
+            st.toast("Avkryssede varer er fjernet!")
+            st.rerun()
 
         if st.button("🗑️ Tøm hele listen", use_container_width=True):
             data["handleliste"] = []
@@ -891,7 +747,6 @@ with fane_handleliste:
 if er_forelder and fane_familie:
     with fane_familie:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
-        
         for i, person in enumerate(list(data["medlemmer"])):
             st.markdown(f"**Person {i+1}: {person}**")
             nytt_navn = st.text_input(f"Navn", value=person, key=f"adm_navn_{i}")
@@ -902,10 +757,8 @@ if er_forelder and fane_familie:
                 gammelt = person
                 nytt = nytt_navn.strip()
                 data["medlemmer"][i] = nytt
-                if gammelt in data.get("stjerne_brukere", []):
-                    data["stjerne_brukere"] = [nytt if x == gammelt else x for x in data["stjerne_brukere"]]
-                if gammelt in data.get("poeng", {}):
-                    data["poeng"][nytt] = data["poeng"].pop(gammelt)
+                if gammelt in data.get("stjerne_brukere", []): data["stjerne_brukere"] = [nytt if x == gammelt else x for x in data["stjerne_brukere"]]
+                if gammelt in data.get("poeng", {}): data["poeng"][nytt] = data["poeng"].pop(gammelt)
                 for o in data.get("oppgaver", []):
                     if o["hvem"] == gammelt: o["hvem"] = nytt
                     if o.get("fullfort_av") == gammelt: o["fullfort_av"] = nytt
@@ -924,13 +777,12 @@ if er_forelder and fane_familie:
                 lagre_data(data)
                 st.rerun()
 
-            if st.button(f"Fjern {person} ✕", key=f"adm_del_{i}"):
-                if len(data["medlemmer"]) > 1:
-                    data["medlemmer"].remove(person)
-                    if person in data.get("stjerne_brukere", []): data["stjerne_brukere"].remove(person)
-                    if person in data.get("poeng", {}): data["poeng"].pop(person)
-                    lagre_data(data)
-                    st.rerun()
+            if st.button(f"Fjern {person} ✕", key=f"adm_del_{i}") and len(data["medlemmer"]) > 1:
+                data["medlemmer"].remove(person)
+                if person in data.get("stjerne_brukere", []): data["stjerne_brukere"].remove(person)
+                if person in data.get("poeng", {}): data["poeng"].pop(person)
+                lagre_data(data)
+                st.rerun()
             st.divider()
 
         with st.form("form_nytt_medlem", clear_on_submit=True):
