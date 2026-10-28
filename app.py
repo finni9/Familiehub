@@ -89,7 +89,6 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
-# Koble til Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def bilde_til_base64(opplastet_fil):
@@ -150,7 +149,7 @@ def standard_data():
         "pin": "1234",
         "sist_nullstilt": idag_str,
         "medlemmer": ["Far", "Mor", "Barn 1", "Barn 2"],
-        "stjerne_brukere": ["Barn 1", "Barn 2", "Far", "Mor"],
+        "stjerne_brukere": ["Barn 1", "Barn 2"],
         "poeng": {"Far": 0, "Mor": 0, "Barn 1": 0, "Barn 2": 0},
         "beskjeder": [
             {"id": str(uuid.uuid4()), "tekst": "Husk gymtøy i morgen! 🏃‍♂️", "fra": "Mor", "tid": "Kl. 08:00"}
@@ -421,12 +420,55 @@ faner = st.tabs(fane_navn)
 fane_oppgaver, fane_butikk, fane_middag, fane_handleliste = faner[0], faner[1], faner[2], faner[3]
 fane_familie = faner[4] if er_forelder else None
 
-# ----------------- FANE 1: OPPGAVER -----------------
+# ----------------- FANE 1: OPPGAVER & VISUELL STJERNETAVLE -----------------
 with fane_oppgaver:
     oppgaver_oppdatert = False
     slett_id = None
     medlemmer = data.get("medlemmer", [])
     stjerne_brukere = data.get("stjerne_brukere", [])
+
+    # Finn billigste premie som barna kan spare mot
+    billigste_premie = None
+    if data.get("belonninger"):
+        billigste_premie = min(data["belonninger"], key=lambda x: x["pris"])
+
+    # VISUELL STJERNETAVLE FOR BARNA ØVERST
+    if stjerne_brukere:
+        st.markdown("#### 🌟 Familiens Stjernetavle")
+        kolonner = st.columns(len(stjerne_brukere))
+        
+        for idx, person in enumerate(stjerne_brukere):
+            antall_stjerner = data["poeng"].get(person, 0)
+            with kolonner[idx]:
+                # Generer stjernestreng (maks 10 stjerner vist fysisk for å holde det pent)
+                fysiske_stjerner = "⭐" * min(antall_stjerner, 10)
+                pluss_tekst = f" (+{antall_stjerner - 10})" if antall_stjerner > 10 else ""
+                
+                motivasjon = ""
+                if billigste_premie:
+                    mangler = billigste_premie["pris"] - antall_stjerner
+                    if mangler <= 0:
+                        motivasjon = f"<div style='font-size: 0.75rem; color: #047857; font-weight: 700; margin-top: 4px;'>🎉 Råd til {billigste_premie['tittel']}!</div>"
+                    else:
+                        motivasjon = f"<div style='font-size: 0.72rem; color: #B45309; margin-top: 4px;'>🎯 Bare <b>{mangler} ⭐</b> til {billigste_premie['tittel']}</div>"
+
+                st.markdown(
+                    f"""
+                    <div style="background: linear-gradient(135deg, #FEF9C3 0%, #FEF08A 100%); 
+                                border: 2px solid #FACC15; border-radius: 12px; padding: 10px; 
+                                text-align: center; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="font-size: 0.95rem; font-weight: 800; color: #854D0E;">👤 {person}</div>
+                        <div style="font-size: 1.8rem; font-weight: 900; color: #A16207; line-height: 1.1; margin: 4px 0;">
+                            {antall_stjerner} <span style="font-size: 1.3rem;">⭐</span>
+                        </div>
+                        <div style="font-size: 0.9rem; letter-spacing: 1px; min-height: 18px;">
+                            {fysiske_stjerner}{pluss_tekst}
+                        </div>
+                        {motivasjon}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
     c_dag, c_uke = st.columns(2)
     with c_dag:
@@ -447,12 +489,12 @@ with fane_oppgaver:
     st.write("")
     for person in medlemmer:
         er_samler = person in stjerne_brukere
-        poeng_tekst = f" • {data['poeng'].get(person, 0)} ⭐" if er_samler else ""
+        poeng_badge = f" 🪙 {data['poeng'].get(person, 0)} ⭐" if er_samler else ""
         person_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == person]
         gjenstaende = len([o for o in person_oppgaver if not o["ferdig"]])
         status_tekst = f"({gjenstaende} igjen)" if gjenstaende > 0 else "(Alt fullført! 🎉)"
 
-        with st.expander(f"👤 **{person}**{poeng_tekst} {status_tekst}", expanded=(gjenstaende > 0)):
+        with st.expander(f"👤 **{person}**{poeng_badge} — {status_tekst}", expanded=(gjenstaende > 0)):
             for oppg in person_oppgaver:
                 oppg_id = oppg["id"]
                 merke = "🔄 " if oppg.get("gjentakende") else ""
