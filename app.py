@@ -166,10 +166,10 @@ def migrer_middagsplan(gammel_plan):
             ny_plan[dag] = ""
     return ny_plan
 
-def standard_data():
+def standard_data(valgt_pin="1234"):
     idag_str = datetime.now(TIDSSONE_NORGE).strftime("%Y-%m-%d")
     return {
-        "pin": "1234",
+        "pin": str(valgt_pin),
         "sist_nullstilt": idag_str,
         "medlemmer": ["Far", "Mor", "Barn 1", "Barn 2"],
         "stjerne_brukere": ["Barn 1", "Barn 2"],
@@ -200,7 +200,6 @@ def hent_hele_tabellen():
         df = conn.read(ttl=0)
         if df.empty:
             return pd.DataFrame(columns=["familie_kode", "data_dump"])
-        # Bakoverkompatibilitet hvis regnearket bare hadde 'data_dump'
         if "familie_kode" not in df.columns:
             df["familie_kode"] = "hoved"
             if "data_dump" not in df.columns:
@@ -209,80 +208,101 @@ def hent_hele_tabellen():
     except Exception:
         return pd.DataFrame(columns=["familie_kode", "data_dump"])
 
-def last_familie_data(familie_kode):
+def hent_familie_json(familie_navn):
     df = hent_hele_tabellen()
-    rad = df[df["familie_kode"].astype(str).str.lower() == familie_kode.lower()]
+    rad = df[df["familie_kode"].astype(str).str.lower() == familie_navn.lower()]
     if not rad.empty:
         try:
-            json_tekst = str(rad["data_dump"].iloc[0])
-            d = json.loads(json_tekst)
-            if "merkedager" not in d: d["merkedager"] = []
-            if "oppskrifter" not in d: d["oppskrifter"] = STANDARD_MIDDAGER
-            else: d["oppskrifter"] = migrer_oppskrifter(d["oppskrifter"])
-            if "basisvarer" not in d: d["basisvarer"] = STANDARD_BASISVARER
-            d["handleliste"] = migrer_handleliste(d.get("handleliste", []))
-            d["middagsplan"] = migrer_middagsplan(d.get("middagsplan", {}))
-            return d
+            return json.loads(str(rad["data_dump"].iloc[0]))
         except Exception:
-            pass
-    # Ny familie opprettes
-    nytt_d = standard_data()
-    lagre_familie_data(familie_kode, nytt_d)
-    return nytt_d
+            return None
+    return None
 
-def lagre_familie_data(familie_kode, ny_data):
+def lagre_familie_data(familie_navn, ny_data):
     try:
         df = hent_hele_tabellen()
         json_tekst = json.dumps(ny_data, ensure_ascii=False)
         
-        mask = df["familie_kode"].astype(str).str.lower() == familie_kode.lower()
+        mask = df["familie_kode"].astype(str).str.lower() == familie_navn.lower()
         if mask.any():
             df.loc[mask, "data_dump"] = json_tekst
         else:
-            ny_rad = pd.DataFrame([{"familie_kode": familie_kode.lower(), "data_dump": json_tekst}])
+            ny_rad = pd.DataFrame([{"familie_kode": familie_navn.strip().lower(), "data_dump": json_tekst}])
             df = pd.concat([df, ny_rad], ignore_index=True)
             
         conn.update(data=df)
     except Exception as e:
         st.error(f"Kunne ikke lagre til Google Sheets: {e}")
 
-# ----------------- HÅNDTERING AV INNLOGGING -----------------
-# Sjekk URL-parametre først (f.eks. ?familie=olsen)
-url_params = st.query_params
-if "familie" in url_params and "aktiv_familie" not in st.session_state:
-    st.session_state["aktiv_familie"] = url_params["familie"].strip().lower()
-
+# ----------------- INNLOGGING MED FAMILIENAVN + PIN -----------------
 if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_familie"]:
     st.markdown(
         """
-        <div style="background-color: #EFF6FF; border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #BFDBFE; margin-top: 20px;">
-            <h1 style="color: #1E3A8A; margin: 0;">🏡 Velkommen til Familiehub</h1>
-            <p style="color: #3B82F6; font-size: 1.1rem; margin-top: 6px;">Skriv inn din familiekode for å åpne ditt hjem</p>
+        <div style="background-color: #EFF6FF; border-radius: 12px; padding: 22px; text-align: center; border: 1px solid #BFDBFE; margin-top: 20px;">
+            <h1 style="color: #1E3A8A; margin: 0; font-size: 1.8rem;">🏡 Familiehub</h1>
+            <p style="color: #3B82F6; font-size: 1.05rem; margin-top: 6px;">Logg inn i familiens hjem med navn og PIN-kode</p>
         </div>
         """,
         unsafe_allow_html=True
     )
     st.write("")
+
+    valg_modus = st.radio("Velg handling:", ["Logg inn", "Opprett ny familie"], horizontal=True)
+
     with st.form("form_login"):
-        tastet_kode = st.text_input("Familiens kode / kallenavn:", placeholder="f.eks. olsen, smola, fam123").strip().lower()
-        er_ny = st.checkbox("Dette er en ny familie (opprett nytt hjem)")
-        knapp = st.form_submit_button("Åpne Familiehub 🚀", use_container_width=True)
+        f_navn = st.text_input("Familiens etternavn / kallenavn:", placeholder="f.eks. Hansen, Olsen").strip()
+        f_pin = st.text_input("Familiens 4-sifrede PIN:", type="password", placeholder="f.eks. 1234", max_chars=8).strip()
         
-        if knapp and tastet_kode:
-            df_sjekk = hent_hele_tabellen()
-            finnes = (df_sjekk["familie_kode"].astype(str).str.lower() == tastet_kode).any()
-            
-            if not er_ny and not finnes:
-                st.error(f"Fant ingen familie med koden '{tastet_kode}'. Huk av for 'Dette er en ny familie' hvis du vil opprette den!")
+        knapp = st.form_submit_button("Åpne Familiehub 🚀", use_container_width=True)
+
+        if knapp:
+            if not f_navn or not f_pin:
+                st.error("Vennligst fyll inn både familienavn og PIN-kode.")
             else:
-                st.session_state["aktiv_familie"] = tastet_kode
-                st.query_params["familie"] = tastet_kode
-                st.rerun()
+                eksisterende_data = hent_familie_json(f_navn)
+
+                if valg_modus == "Logg inn":
+                    if not eksisterende_data:
+                        st.error(f"Fant ingen familie med navnet '{f_navn}'. Sjekk skrivemåten eller velg 'Opprett ny familie'.")
+                    else:
+                        riktig_pin = str(eksisterende_data.get("pin", "1234"))
+                        if f_pin == riktig_pin:
+                            st.session_state["aktiv_familie"] = f_navn.lower()
+                            st.toast(f"Velkommen hjem, familie {f_navn}! 👋")
+                            st.rerun()
+                        else:
+                            st.error("Feil PIN-kode for denne familien!")
+
+                elif valg_modus == "Opprett ny familie":
+                    if eksisterende_data:
+                        st.error(f"Familienavnet '{f_navn}' er allerede opptatt! Vennligst velg et annet kallenavn.")
+                    else:
+                        ny_fam = standard_data(valgt_pin=f_pin)
+                        lagre_familie_data(f_navn, ny_fam)
+                        st.session_state["aktiv_familie"] = f_navn.lower()
+                        st.success(f"Familien {f_navn} er opprettet! Åpner huben...")
+                        st.rerun()
+
     st.stop()
 
-# Aktiv familie er valgt
+# ----------------- HENT OG FORBERED DATA -----------------
 aktiv_kode = st.session_state["aktiv_familie"]
-data = last_familie_data(aktiv_kode)
+raw_data = hent_familie_json(aktiv_kode)
+
+if not raw_data:
+    st.error("Kunne ikke hente familiedata. Vennligst logg inn på nytt.")
+    st.session_state["aktiv_familie"] = ""
+    st.stop()
+
+# Datamigreringer
+if "merkedager" not in raw_data: raw_data["merkedager"] = []
+if "oppskrifter" not in raw_data: raw_data["oppskrifter"] = STANDARD_MIDDAGER
+else: raw_data["oppskrifter"] = migrer_oppskrifter(raw_data["oppskrifter"])
+if "basisvarer" not in raw_data: raw_data["basisvarer"] = STANDARD_BASISVARER
+raw_data["handleliste"] = migrer_handleliste(raw_data.get("handleliste", []))
+raw_data["middagsplan"] = migrer_middagsplan(raw_data.get("middagsplan", {}))
+
+data = raw_data
 
 def lagre_naa():
     lagre_familie_data(aktiv_kode, data)
@@ -360,10 +380,10 @@ if "foreldremodus" not in st.session_state:
 
 # ----------------- FORELDREKONTROLL & BYTT FAMILIE -----------------
 with st.sidebar:
-    st.markdown(f"🏷️ **Familie:** `{aktiv_kode}`")
+    st.markdown(f"🏷️ **Familie:** `{aktiv_kode.capitalize()}`")
     if st.button("🚪 Bytt / Logg ut av familie", use_container_width=True):
         st.session_state["aktiv_familie"] = ""
-        st.query_params.clear()
+        st.session_state["foreldremodus"] = False
         st.rerun()
 
     st.write("---")
@@ -383,7 +403,7 @@ with st.sidebar:
                 st.toast("PIN-kode er oppdatert!")
     else:
         st.info("🔒 Barnemodus aktiv")
-        tastet_pin = st.text_input("PIN for mor/far:", type="password", placeholder="Standard: 1234")
+        tastet_pin = st.text_input("PIN for mor/far:", type="password", placeholder="Tast familie-PIN")
         if st.button("Lås opp", use_container_width=True):
             if tastet_pin == data.get("pin", "1234"):
                 st.session_state["foreldremodus"] = True
@@ -401,7 +421,7 @@ klokke_tekst = naa.strftime("%H:%M")
 st.markdown(
     f"""
     <div style="background-color: #EFF6FF; border-radius: 12px; padding: 12px; text-align: center; margin-bottom: 8px; border: 1px solid #BFDBFE;">
-        <h2 style="margin: 0; color: #1E3A8A; font-size: 1.5rem;">🏡 Familiehub</h2>
+        <h2 style="margin: 0; color: #1E3A8A; font-size: 1.5rem;">🏡 Familiehub ({aktiv_kode.capitalize()})</h2>
         <div style="margin-top: 4px; font-size: 1.05rem; font-weight: 600; color: #1E40AF;">
             📅 {dato_tekst} &nbsp;•&nbsp; ⏰ kl. {klokke_tekst}
         </div>
@@ -624,7 +644,7 @@ with fane_oppgaver:
                         if er_samler: data["poeng"][person] = max(0, data["poeng"].get(person, 0) - stjerner)
                     oppgaver_oppdatert = True
 
-    # FELLESOPPGAVER MED FLERVALG OG STJERNEDELING
+    # FELLESOPPGAVER
     felles_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == FELLES_VALG]
     if felles_oppgaver:
         with st.expander(f"🤝 **Fellesoppgaver** ({len(felles_oppgaver)})", expanded=True):
