@@ -98,6 +98,8 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
+st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
+
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def bilde_til_base64(opplastet_fil):
@@ -173,7 +175,7 @@ def standard_data():
         "stjerne_brukere": ["Barn 1", "Barn 2"],
         "poeng": {"Far": 0, "Mor": 0, "Barn 1": 0, "Barn 2": 0},
         "beskjeder": [
-            {"id": str(uuid.uuid4()), "tekst": "Husk gymtøy i morgen! 🏃‍♂️", "fra": "Mor", "tid": "Kl. 08:00"}
+            {"id": str(uuid.uuid4()), "tekst": "Velkommen til Familiehuben! 🌟", "fra": "Familien", "tid": "Kl. 08:00"}
         ],
         "merkedager": [],
         "belonninger": [
@@ -192,11 +194,27 @@ def standard_data():
         "handleliste": migrer_handleliste(["Melk", "Brød", "Smør"])
     }
 
-def last_data():
+# ----------------- MULTI-FAMILIE GOOGLE SHEETS -----------------
+def hent_hele_tabellen():
     try:
         df = conn.read(ttl=0)
-        if not df.empty and "data_dump" in df.columns:
-            json_tekst = str(df["data_dump"].iloc[0])
+        if df.empty:
+            return pd.DataFrame(columns=["familie_kode", "data_dump"])
+        # Bakoverkompatibilitet hvis regnearket bare hadde 'data_dump'
+        if "familie_kode" not in df.columns:
+            df["familie_kode"] = "hoved"
+            if "data_dump" not in df.columns:
+                df["data_dump"] = "{}"
+        return df[["familie_kode", "data_dump"]].dropna(subset=["familie_kode"])
+    except Exception:
+        return pd.DataFrame(columns=["familie_kode", "data_dump"])
+
+def last_familie_data(familie_kode):
+    df = hent_hele_tabellen()
+    rad = df[df["familie_kode"].astype(str).str.lower() == familie_kode.lower()]
+    if not rad.empty:
+        try:
+            json_tekst = str(rad["data_dump"].iloc[0])
             d = json.loads(json_tekst)
             if "merkedager" not in d: d["merkedager"] = []
             if "oppskrifter" not in d: d["oppskrifter"] = STANDARD_MIDDAGER
@@ -205,21 +223,69 @@ def last_data():
             d["handleliste"] = migrer_handleliste(d.get("handleliste", []))
             d["middagsplan"] = migrer_middagsplan(d.get("middagsplan", {}))
             return d
-    except Exception:
-        pass
-    d = standard_data()
-    lagre_data(d)
-    return d
+        except Exception:
+            pass
+    # Ny familie opprettes
+    nytt_d = standard_data()
+    lagre_familie_data(familie_kode, nytt_d)
+    return nytt_d
 
-def lagre_data(data):
+def lagre_familie_data(familie_kode, ny_data):
     try:
-        json_tekst = json.dumps(data, ensure_ascii=False)
-        df = pd.DataFrame([{"data_dump": json_tekst}])
+        df = hent_hele_tabellen()
+        json_tekst = json.dumps(ny_data, ensure_ascii=False)
+        
+        mask = df["familie_kode"].astype(str).str.lower() == familie_kode.lower()
+        if mask.any():
+            df.loc[mask, "data_dump"] = json_tekst
+        else:
+            ny_rad = pd.DataFrame([{"familie_kode": familie_kode.lower(), "data_dump": json_tekst}])
+            df = pd.concat([df, ny_rad], ignore_index=True)
+            
         conn.update(data=df)
     except Exception as e:
         st.error(f"Kunne ikke lagre til Google Sheets: {e}")
 
-data = last_data()
+# ----------------- HÅNDTERING AV INNLOGGING -----------------
+# Sjekk URL-parametre først (f.eks. ?familie=olsen)
+url_params = st.query_params
+if "familie" in url_params and "aktiv_familie" not in st.session_state:
+    st.session_state["aktiv_familie"] = url_params["familie"].strip().lower()
+
+if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_familie"]:
+    st.markdown(
+        """
+        <div style="background-color: #EFF6FF; border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #BFDBFE; margin-top: 20px;">
+            <h1 style="color: #1E3A8A; margin: 0;">🏡 Velkommen til Familiehub</h1>
+            <p style="color: #3B82F6; font-size: 1.1rem; margin-top: 6px;">Skriv inn din familiekode for å åpne ditt hjem</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.write("")
+    with st.form("form_login"):
+        tastet_kode = st.text_input("Familiens kode / kallenavn:", placeholder="f.eks. olsen, smola, fam123").strip().lower()
+        er_ny = st.checkbox("Dette er en ny familie (opprett nytt hjem)")
+        knapp = st.form_submit_button("Åpne Familiehub 🚀", use_container_width=True)
+        
+        if knapp and tastet_kode:
+            df_sjekk = hent_hele_tabellen()
+            finnes = (df_sjekk["familie_kode"].astype(str).str.lower() == tastet_kode).any()
+            
+            if not er_ny and not finnes:
+                st.error(f"Fant ingen familie med koden '{tastet_kode}'. Huk av for 'Dette er en ny familie' hvis du vil opprette den!")
+            else:
+                st.session_state["aktiv_familie"] = tastet_kode
+                st.query_params["familie"] = tastet_kode
+                st.rerun()
+    st.stop()
+
+# Aktiv familie er valgt
+aktiv_kode = st.session_state["aktiv_familie"]
+data = last_familie_data(aktiv_kode)
+
+def lagre_naa():
+    lagre_familie_data(aktiv_kode, data)
 
 # ----------------- MIDNATT-NULLSTILLING -----------------
 idag_dato = datetime.now(TIDSSONE_NORGE).date()
@@ -235,7 +301,7 @@ if data.get("sist_nullstilt") != idag_str:
         if datetime.strptime(m["dato"], "%Y-%m-%d").date() >= idag_dato
     ]
     data["sist_nullstilt"] = idag_str
-    lagre_data(data)
+    lagre_naa()
 
 def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
     if not varenavn.strip(): return False
@@ -262,7 +328,7 @@ def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
 
 def cb_sett_middag(dag, rett):
     data["middagsplan"][dag] = rett
-    lagre_data(data)
+    lagre_naa()
     st.session_state[f"rett_{dag}"] = rett
 
 def cb_auto_planlegg(oppskriftsliste):
@@ -273,7 +339,7 @@ def cb_auto_planlegg(oppskriftsliste):
         ny_rett = ukens_trekk[i]
         data["middagsplan"][dag] = ny_rett
         st.session_state[f"rett_{dag}"] = ny_rett
-    lagre_data(data)
+    lagre_naa()
 
 def cb_start_ny_uke():
     data["oppgaver"] = [o for o in data["oppgaver"] if o.get("gjentakende", False) or not o["ferdig"]]
@@ -283,7 +349,7 @@ def cb_start_ny_uke():
     for dag in DAGER:
         data["middagsplan"][dag] = ""
         st.session_state[f"rett_{dag}"] = ""
-    lagre_data(data)
+    lagre_naa()
 
 for dag in DAGER:
     if f"rett_{dag}" not in st.session_state:
@@ -292,10 +358,15 @@ for dag in DAGER:
 if "foreldremodus" not in st.session_state:
     st.session_state["foreldremodus"] = False
 
-st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
-
-# ----------------- FORELDREKONTROLL -----------------
+# ----------------- FORELDREKONTROLL & BYTT FAMILIE -----------------
 with st.sidebar:
+    st.markdown(f"🏷️ **Familie:** `{aktiv_kode}`")
+    if st.button("🚪 Bytt / Logg ut av familie", use_container_width=True):
+        st.session_state["aktiv_familie"] = ""
+        st.query_params.clear()
+        st.rerun()
+
+    st.write("---")
     st.header("🔐 Foreldrekontroll")
     if st.session_state["foreldremodus"]:
         st.success("🔓 Foreldremodus er AKTIV")
@@ -308,7 +379,7 @@ with st.sidebar:
             ny_pin = st.text_input("Ny 4-sifret PIN:", type="password", max_chars=8)
             if st.button("Lagre ny PIN") and ny_pin.strip():
                 data["pin"] = ny_pin.strip()
-                lagre_data(data)
+                lagre_naa()
                 st.toast("PIN-kode er oppdatert!")
     else:
         st.info("🔒 Barnemodus aktiv")
@@ -376,7 +447,7 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager (Trykk her)**", expa
 
         if slett_merkedag_id:
             data["merkedager"] = [m for m in data["merkedager"] if m["id"] != slett_merkedag_id]
-            lagre_data(data)
+            lagre_naa()
             st.rerun()
     else:
         st.caption("Ingen merkedager lagt inn.")
@@ -395,7 +466,7 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager (Trykk her)**", expa
                 "dato": m_dato_valg.strftime("%Y-%m-%d"),
                 "ikon": m_ikon.split()[0]
             })
-            lagre_data(data)
+            lagre_naa()
             st.toast("Merkedag lagret!")
             st.rerun()
 
@@ -422,7 +493,7 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
 
         if slett_beskjed_id:
             data["beskjeder"] = [b for b in data["beskjeder"] if b["id"] != slett_beskjed_id]
-            lagre_data(data)
+            lagre_naa()
             st.rerun()
     else:
         st.caption("Ingen beskjeder akkurat nå.")
@@ -439,7 +510,7 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
                 "fra": hvem_fra,
                 "tid": tidspunkt
             })
-            lagre_data(data)
+            lagre_naa()
             st.rerun()
 
 er_forelder = st.session_state["foreldremodus"]
@@ -511,7 +582,7 @@ with fane_oppgaver:
                 if o.get("gjentakende", False):
                     o["ferdig"] = False
                     o["fullfort_av"] = None
-            lagre_data(data)
+            lagre_naa()
             st.toast("Daglige rutiner er nullstilt! ☀️")
             st.rerun()
     with c_uke:
@@ -563,7 +634,6 @@ with fane_oppgaver:
                 tot_stjerner = oppg.get("stjerner", 2)
                 tekst_visning = f"{merke}{oppg['tekst']} *(+{tot_stjerner} ⭐)*"
 
-                # Hent ut fullfort_av (støtter bakoverkompatibilitet for streng eller liste)
                 fa_raw = oppg.get("fullfort_av")
                 if isinstance(fa_raw, list):
                     tidligere_hjelpere = fa_raw
@@ -601,7 +671,6 @@ with fane_oppgaver:
                         hjelpere_aa_belonne = valgte_hjelpere if valgte_hjelpere else ([medlemmer[0]] if medlemmer else [])
                         oppg["fullfort_av"] = hjelpere_aa_belonne
                         antall_hjelpere = max(1, len(hjelpere_aa_belonne))
-                        # Del stjerner (minst 1 ⭐ per person som deltar)
                         stjerner_hver = max(1, round(tot_stjerner / antall_hjelpere))
                         
                         for h in hjelpere_aa_belonne:
@@ -609,7 +678,7 @@ with fane_oppgaver:
                                 data["poeng"][h] = data["poeng"].get(h, 0) + stjerner_hver
                         
                         st.balloons()
-                        st.toast(f"🎉 Fantastisk samarbeid! +{stjerner_hver} ⭐ til hver.")
+                        st.toast(f"🎉 Samarbeidsbonus! +{stjerner_hver} ⭐ til hver.")
                     else:
                         gamle_hjelpere = tidligere_hjelpere
                         antall_for = max(1, len(gamle_hjelpere))
@@ -623,11 +692,11 @@ with fane_oppgaver:
 
     if slett_id:
         data["oppgaver"] = [o for o in data["oppgaver"] if o["id"] != slett_id]
-        lagre_data(data)
+        lagre_naa()
         st.rerun()
 
     if oppgaver_oppdatert:
-        lagre_data(data)
+        lagre_naa()
         st.rerun()
 
     if er_forelder:
@@ -644,7 +713,7 @@ with fane_oppgaver:
                             "id": str(uuid.uuid4()), "tekst": oppg_tekst.strip(), "hvem": p,
                             "ferdig": False, "stjerner": int(stjerner), "fullfort_av": None, "gjentakende": er_daglig
                         })
-                    lagre_data(data)
+                    lagre_naa()
                     st.toast("Oppgave lagt til!")
                     st.rerun()
 
@@ -666,7 +735,7 @@ with fane_butikk:
             har_rad = data["poeng"].get(hvem_kjoper, 0) >= bel["pris"]
             if st.button("Løs inn 🎉", key=f"btn_kjop_{bel['id']}", disabled=not har_rad, use_container_width=True):
                 data["poeng"][hvem_kjoper] -= bel["pris"]
-                lagre_data(data)
+                lagre_naa()
                 st.balloons()
                 st.toast(f"🎉 Gratulerer {hvem_kjoper}!")
                 st.rerun()
@@ -677,7 +746,7 @@ with fane_butikk:
 
     if slett_belonning_id:
         data["belonninger"] = [b for b in data["belonninger"] if b["id"] != slett_belonning_id]
-        lagre_data(data)
+        lagre_naa()
         st.rerun()
 
     if er_forelder:
@@ -687,7 +756,7 @@ with fane_butikk:
                 b_pris = st.number_input("Pris i stjerner:", min_value=1, max_value=100, value=5)
                 if st.form_submit_button("Lagre premie", use_container_width=True) and b_tittel.strip():
                     data["belonninger"].append({"id": str(uuid.uuid4()), "tittel": b_tittel.strip(), "pris": int(b_pris)})
-                    lagre_data(data)
+                    lagre_naa()
                     st.rerun()
 
 # ----------------- FANE 3: MIDDAG MED BILDER -----------------
@@ -705,7 +774,7 @@ with fane_middag:
                 if rett in oppskrifter:
                     for i_navn in oppskrifter[rett].get("ingredienser", []):
                         if legg_til_vare_i_data(i_navn): lagt += 1
-            lagre_data(data)
+            lagre_naa()
             st.toast(f"{lagt} ingredienser lagt i handlelisten! 🛒")
 
     st.write("---")
@@ -732,7 +801,7 @@ with fane_middag:
             
             if ny_rett in oppskrifter and c_r2.button("🛒", key=f"kjop_dag_{dag}", help=f"Kjøp til {ny_rett}"):
                 for i_navn in oppskrifter[ny_rett].get("ingredienser", []): legg_til_vare_i_data(i_navn)
-                lagre_data(data)
+                lagre_naa()
                 st.toast(f"Ingredienser til {ny_rett} lagt til!")
 
             if ny_rett != data["middagsplan"].get(dag, ""):
@@ -741,7 +810,7 @@ with fane_middag:
             
             st.divider()
 
-    if plan_oppdatert: lagre_data(data)
+    if plan_oppdatert: lagre_naa()
 
     with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
@@ -765,7 +834,7 @@ with fane_middag:
                     b64 = bilde_til_base64(nytt_bilde_fil)
                     if b64:
                         oppskrifter[tittel]["bilde"] = b64
-                        lagre_data(data)
+                        lagre_naa()
                         st.toast(f"Bilde lagret for {tittel}!")
                         st.rerun()
 
@@ -775,7 +844,7 @@ with fane_middag:
 
         if slett_oppskrift:
             del data["oppskrifter"][slett_oppskrift]
-            lagre_data(data)
+            lagre_naa()
             st.rerun()
 
         if er_forelder:
@@ -789,7 +858,7 @@ with fane_middag:
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
-                    lagre_data(data)
+                    lagre_naa()
                     st.toast(f"{ny_r.strip()} er lagt til!")
                     st.rerun()
 
@@ -812,7 +881,7 @@ with fane_handleliste:
                 
                 if cols[c_idx].button(f"+ {b_label}", key=f"quick_btn_{b_id}", use_container_width=True):
                     if legg_til_vare_i_data(b_navn, "", b_kat):
-                        lagre_data(data)
+                        lagre_naa()
                         st.toast(f"Lagt til {b_navn}!")
                         st.rerun()
                     else:
@@ -829,7 +898,7 @@ with fane_handleliste:
         if st.form_submit_button("Legg til vare", use_container_width=True) and ny_v.strip():
             k = None if ny_kat == "✨ Automatisk" else ny_kat
             if legg_til_vare_i_data(ny_v, ny_mengde, k):
-                lagre_data(data)
+                lagre_naa()
                 st.rerun()
 
     st.write("---")
@@ -858,20 +927,20 @@ with fane_handleliste:
                 st.write("")
 
         if handleliste_oppdatert:
-            lagre_data(data)
+            lagre_naa()
             st.rerun()
 
         st.divider()
         antall_kjopte = len([v for v in data["handleliste"] if v.get("kjopt", False)])
         if antall_kjopte > 0 and st.button(f"🧹 Fjern {antall_kjopte} avkryssede varer", use_container_width=True):
             data["handleliste"] = [v for v in data["handleliste"] if not v.get("kjopt", False)]
-            lagre_data(data)
+            lagre_naa()
             st.toast("Avkryssede varer er fjernet!")
             st.rerun()
 
         if st.button("🗑️ Tøm hele listen", use_container_width=True):
             data["handleliste"] = []
-            lagre_data(data)
+            lagre_naa()
             st.rerun()
 
 # ----------------- FANE 5: FAMILIEADMIN -----------------
@@ -899,7 +968,7 @@ if er_forelder and fane_familie:
                         o["fullfort_av"] = [nytt if x == gammelt else x for x in o["fullfort_av"]]
                     elif o.get("fullfort_av") == gammelt:
                         o["fullfort_av"] = nytt
-                lagre_data(data)
+                lagre_naa()
                 st.rerun()
 
             if skal_ha != er_stjernesamler:
@@ -908,14 +977,14 @@ if er_forelder and fane_familie:
                     if person not in data["poeng"]: data["poeng"][person] = 0
                 else:
                     if person in data["stjerne_brukere"]: data["stjerne_brukere"].remove(person)
-                lagre_data(data)
+                lagre_naa()
                 st.rerun()
 
             if st.button(f"Fjern {person} ✕", key=f"adm_del_{i}") and len(data["medlemmer"]) > 1:
                 data["medlemmer"].remove(person)
                 if person in data.get("stjerne_brukere", []): data["stjerne_brukere"].remove(person)
                 if person in data.get("poeng", {}): data["poeng"].pop(person)
-                lagre_data(data)
+                lagre_naa()
                 st.rerun()
             st.write("")
 
@@ -928,7 +997,7 @@ if er_forelder and fane_familie:
                     if f_s:
                         data["stjerne_brukere"].append(f_n.strip())
                         data["poeng"][f_n.strip()] = 0
-                    lagre_data(data)
+                    lagre_naa()
                     st.rerun()
 
         st.divider()
@@ -948,7 +1017,7 @@ if er_forelder and fane_familie:
 
         if slett_b_id:
             data["basisvarer"] = [x for x in data["basisvarer"] if x["id"] != slett_b_id]
-            lagre_data(data)
+            lagre_naa()
             st.toast("Hurtigknapp slettet!")
             st.rerun()
 
@@ -974,6 +1043,6 @@ if er_forelder and fane_familie:
                         "navn": renset_navn,
                         "kategori": valgt_kat
                     })
-                    lagre_data(data)
+                    lagre_naa()
                     st.toast(f"Lagt til hurtigknapp for {renset_navn}!")
                     st.rerun()
