@@ -234,6 +234,24 @@ def lagre_familie_data(familie_navn, ny_data):
     except Exception as e:
         st.error(f"Kunne ikke lagre til Google Sheets: {e}")
 
+def endre_familie_navn(gammelt_navn, nytt_navn):
+    try:
+        df = hent_hele_tabellen()
+        nytt_renset = nytt_navn.strip().lower()
+        gammelt_renset = gammelt_navn.strip().lower()
+        
+        if (df["familie_kode"].astype(str).str.lower() == nytt_renset).any():
+            return False, "Dette familienavnet er allerede opptatt av en annen familie!"
+            
+        mask = df["familie_kode"].astype(str).str.lower() == gammelt_renset
+        if mask.any():
+            df.loc[mask, "familie_kode"] = nytt_renset
+            conn.update(data=df)
+            return True, "Navnet er oppdatert!"
+        return False, "Fant ikke den opprinnelige familien i databasen."
+    except Exception as e:
+        return False, f"Feil ved oppdatering i Google Sheets: {e}"
+
 # ----------------- INNLOGGING MED FAMILIENAVN + PIN -----------------
 if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_familie"]:
     st.markdown(
@@ -294,7 +312,6 @@ if not raw_data:
     st.session_state["aktiv_familie"] = ""
     st.stop()
 
-# Datamigreringer
 if "merkedager" not in raw_data: raw_data["merkedager"] = []
 if "oppskrifter" not in raw_data: raw_data["oppskrifter"] = STANDARD_MIDDAGER
 else: raw_data["oppskrifter"] = migrer_oppskrifter(raw_data["oppskrifter"])
@@ -968,7 +985,24 @@ if er_forelder and fane_familie:
     with fane_familie:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
         
-        # 1. Medlemmer
+        # 1. Endre navn på familiehuben
+        with st.expander("🏷️ **Endre navnet på Familiehuben**", expanded=False):
+            st.caption("Dette endrer både navnet som vises øverst og kallenavnet dere bruker ved innlogging.")
+            with st.form("form_endre_fam_navn"):
+                nytt_hub_navn = st.text_input("Nytt navn på huben:", value=aktiv_kode.capitalize())
+                if st.form_submit_button("Lagre nytt familienavn", use_container_width=True):
+                    if nytt_hub_navn.strip() and nytt_hub_navn.strip().lower() != aktiv_kode.lower():
+                        suksess, melding = endre_familie_navn(aktiv_kode, nytt_hub_navn.strip())
+                        if suksess:
+                            st.session_state["aktiv_familie"] = nytt_hub_navn.strip().lower()
+                            st.toast("Familienavnet er endret! 🎉")
+                            st.rerun()
+                        else:
+                            st.error(melding)
+
+        st.divider()
+
+        # 2. Familiemedlemmer
         st.markdown("#### 👤 Familiemedlemmer")
         for i, person in enumerate(list(data["medlemmer"])):
             st.markdown(f"**Person {i+1}: {person}**")
@@ -1022,7 +1056,7 @@ if er_forelder and fane_familie:
 
         st.divider()
 
-        # 2. Hurtigknapper for basisvarer
+        # 3. Hurtigknapper for basisvarer
         st.markdown("#### ⚡ Administrer Hurtigknapper for basisvarer")
         st.caption("Her bestemmer mor og far hvilke knapper som dukker opp øverst på handlelisten.")
         
