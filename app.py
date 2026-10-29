@@ -210,7 +210,7 @@ def hent_hele_tabellen():
 
 def hent_familie_json(familie_navn):
     df = hent_hele_tabellen()
-    rad = df[df["familie_kode"].astype(str).str.lower() == familie_navn.lower()]
+    rad = df[df["familie_kode"].astype(str).str.lower() == str(familie_navn).lower()]
     if not rad.empty:
         try:
             return json.loads(str(rad["data_dump"].iloc[0]))
@@ -223,11 +223,11 @@ def lagre_familie_data(familie_navn, ny_data):
         df = hent_hele_tabellen()
         json_tekst = json.dumps(ny_data, ensure_ascii=False)
         
-        mask = df["familie_kode"].astype(str).str.lower() == familie_navn.lower()
+        mask = df["familie_kode"].astype(str).str.lower() == str(familie_navn).lower()
         if mask.any():
             df.loc[mask, "data_dump"] = json_tekst
         else:
-            ny_rad = pd.DataFrame([{"familie_kode": familie_navn.strip().lower(), "data_dump": json_tekst}])
+            ny_rad = pd.DataFrame([{"familie_kode": str(familie_navn).strip().lower(), "data_dump": json_tekst}])
             df = pd.concat([df, ny_rad], ignore_index=True)
             
         conn.update(data=df)
@@ -252,7 +252,17 @@ def endre_familie_navn(gammelt_navn, nytt_navn):
     except Exception as e:
         return False, f"Feil ved oppdatering i Google Sheets: {e}"
 
-# ----------------- INNLOGGING MED FAMILIENAVN + PIN -----------------
+# ----------------- INNLOGGING MED AUTO-REMEMBER -----------------
+url_params = st.query_params
+
+if "aktiv_familie" not in st.session_state:
+    if "fam" in url_params and "key" in url_params:
+        lagret_fam = url_params["fam"].strip().lower()
+        lagret_key = str(url_params["key"]).strip()
+        f_data = hent_familie_json(lagret_fam)
+        if f_data and str(f_data.get("pin", "")) == lagret_key:
+            st.session_state["aktiv_familie"] = lagret_fam
+
 if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_familie"]:
     st.markdown(
         """
@@ -270,6 +280,7 @@ if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_famili
     with st.form("form_login"):
         f_navn = st.text_input("Familiens etternavn / kallenavn:", placeholder="f.eks. Hansen, Olsen").strip()
         f_pin = st.text_input("Familiens 4-sifrede PIN:", type="password", placeholder="f.eks. 1234", max_chars=8).strip()
+        husk_meg = st.checkbox("Husk denne enheten (slipper å logge inn på nytt her)", value=True)
         
         knapp = st.form_submit_button("Åpne Familiehub 🚀", use_container_width=True)
 
@@ -286,6 +297,9 @@ if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_famili
                         riktig_pin = str(eksisterende_data.get("pin", "1234"))
                         if f_pin == riktig_pin:
                             st.session_state["aktiv_familie"] = f_navn.lower()
+                            if husk_meg:
+                                st.query_params["fam"] = f_navn.lower()
+                                st.query_params["key"] = f_pin
                             st.toast(f"Velkommen hjem, familie {f_navn}! 👋")
                             st.rerun()
                         else:
@@ -298,6 +312,9 @@ if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_famili
                         ny_fam = standard_data(valgt_pin=f_pin)
                         lagre_familie_data(f_navn, ny_fam)
                         st.session_state["aktiv_familie"] = f_navn.lower()
+                        if husk_meg:
+                            st.query_params["fam"] = f_navn.lower()
+                            st.query_params["key"] = f_pin
                         st.success(f"Familien {f_navn} er opprettet! Åpner huben...")
                         st.rerun()
 
@@ -310,6 +327,7 @@ raw_data = hent_familie_json(aktiv_kode)
 if not raw_data:
     st.error("Kunne ikke hente familiedata. Vennligst logg inn på nytt.")
     st.session_state["aktiv_familie"] = ""
+    st.query_params.clear()
     st.stop()
 
 if "merkedager" not in raw_data: raw_data["merkedager"] = []
@@ -401,6 +419,7 @@ with st.sidebar:
     if st.button("🚪 Bytt / Logg ut av familie", use_container_width=True):
         st.session_state["aktiv_familie"] = ""
         st.session_state["foreldremodus"] = False
+        st.query_params.clear()
         st.rerun()
 
     st.write("---")
@@ -417,6 +436,8 @@ with st.sidebar:
             if st.button("Lagre ny PIN") and ny_pin.strip():
                 data["pin"] = ny_pin.strip()
                 lagre_naa()
+                if "key" in st.query_params:
+                    st.query_params["key"] = ny_pin.strip()
                 st.toast("PIN-kode er oppdatert!")
     else:
         st.info("🔒 Barnemodus aktiv")
@@ -994,7 +1015,10 @@ if er_forelder and fane_familie:
                     if nytt_hub_navn.strip() and nytt_hub_navn.strip().lower() != aktiv_kode.lower():
                         suksess, melding = endre_familie_navn(aktiv_kode, nytt_hub_navn.strip())
                         if suksess:
-                            st.session_state["aktiv_familie"] = nytt_hub_navn.strip().lower()
+                            ny_kode = nytt_hub_navn.strip().lower()
+                            st.session_state["aktiv_familie"] = ny_kode
+                            if "fam" in st.query_params:
+                                st.query_params["fam"] = ny_kode
                             st.toast("Familienavnet er endret! 🎉")
                             st.rerun()
                         else:
