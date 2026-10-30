@@ -106,11 +106,12 @@ def bilde_til_base64(opplastet_fil):
     try:
         bilde = Image.open(opplastet_fil)
         bilde = bilde.convert("RGB")
-        max_str = 600
+        # Komprimer litt mer for å aldri sprenge Google Sheets' 50k tegn per celle
+        max_str = 400
         if max(bilde.size) > max_str:
             bilde.thumbnail((max_str, max_str), Image.Resampling.LANCZOS)
         buffer = io.BytesIO()
-        bilde.save(buffer, format="JPEG", quality=75)
+        bilde.save(buffer, format="JPEG", quality=60, optimize=True)
         kodet = base64.b64encode(buffer.getvalue()).decode("utf-8")
         return f"data:image/jpeg;base64,{kodet}"
     except Exception:
@@ -223,6 +224,11 @@ def lagre_familie_data(familie_navn, ny_data):
         df = hent_hele_tabellen()
         json_tekst = json.dumps(ny_data, ensure_ascii=False)
         
+        # Sikkerhetssjekk mot cellestørrelse i Google Sheets (maks 50k tegn)
+        if len(json_tekst) > 48000:
+            st.error("⚠️ Datamengden er for stor for regnearket (for mange eller store bilder). Bildet ble ikke lagret.")
+            return False
+        
         mask = df["familie_kode"].astype(str).str.lower() == str(familie_navn).lower()
         if mask.any():
             df.loc[mask, "data_dump"] = json_tekst
@@ -231,8 +237,10 @@ def lagre_familie_data(familie_navn, ny_data):
             df = pd.concat([df, ny_rad], ignore_index=True)
             
         conn.update(data=df)
+        return True
     except Exception as e:
         st.error(f"Kunne ikke lagre til Google Sheets: {e}")
+        return False
 
 def endre_familie_navn(gammelt_navn, nytt_navn):
     try:
@@ -892,9 +900,9 @@ with fane_middag:
                     b64 = bilde_til_base64(nytt_bilde_fil)
                     if b64:
                         oppskrifter[tittel]["bilde"] = b64
-                        lagre_naa()
-                        st.toast(f"Bilde lagret for {tittel}!")
-                        st.rerun()
+                        if lagre_naa():
+                            st.toast(f"Bilde lagret for {tittel}!")
+                            st.rerun()
 
             if er_forelder and st.button("Slett oppskrift ✕", key=f"del_op_{tittel}"):
                 slett_oppskrift = tittel
@@ -916,9 +924,9 @@ with fane_middag:
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
-                    lagre_naa()
-                    st.toast(f"{ny_r.strip()} er lagt til!")
-                    st.rerun()
+                    if lagre_naa():
+                        st.toast(f"{ny_r.strip()} er lagt til!")
+                        st.rerun()
 
 # ----------------- FANE 4: HANDLELISTE MED HURTIGVALG -----------------
 with fane_handleliste:
