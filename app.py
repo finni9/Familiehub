@@ -109,6 +109,7 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
+# ----------------- TEMA-ORDLISTE MED 6 TEMAER -----------------
 TEMAER = {
     "🌅 Varm Solnedgang": {
         "bg_color": "#FFE9DE",
@@ -550,41 +551,81 @@ t_stil = TEMAER[valgt_tema]
 st.markdown(
     f"""
     <style>
-        /* Tvinger farge på alle bakgrunnslag i Streamlit */
+        /* 1. Helsidens bakgrunn */
         .stApp, [data-testid="stAppViewContainer"], .main {{
             background-color: {t_stil['bg_color']} !important;
         }}
         
-        /* Gjør innholdskort og expanders tydelige og skarpe mot bakgrunnen */
+        /* 2. Innholdskort og Expander-bokser (hvit flate med myk kant) */
         div[data-testid="stExpander"] {{
             background-color: #FFFFFF !important;
             border-radius: 12px !important;
-            border: 1px solid rgba(0, 0, 0, 0.08) !important;
+            border: 1.5px solid rgba(15, 23, 42, 0.12) !important;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
-            margin-bottom: 8px !important;
+            margin-bottom: 10px !important;
         }}
 
-        /* Sikrer at vanlige knapper har hvit bakgrunn, mørk tekst og tydelig kant */
+        /* 3. Tvinger mørk, fet skrift på ekspander-overskrifter (Oppslagstavle, Kalender etc.) */
+        div[data-testid="stExpander"] summary,
+        div[data-testid="stExpander"] summary *,
+        div[data-testid="stExpander"] details summary span,
+        div[data-testid="stExpander"] details summary p {{
+            color: #0F172A !important;
+            font-size: 1.05rem !important;
+            font-weight: 800 !important;
+        }}
+
+        /* Ikon-pilen i ekspanderne */
+        div[data-testid="stExpander"] summary svg {{
+            fill: #0F172A !important;
+            stroke: #0F172A !important;
+        }}
+
+        /* 4. Fanelinjen øverst */
+        .stTabs [data-baseweb="tab-list"] {{
+            background-color: rgba(255, 255, 255, 0.85) !important;
+            border-radius: 12px !important;
+            padding: 6px !important;
+            border: 1px solid rgba(15, 23, 42, 0.1) !important;
+            gap: 4px !important;
+        }}
+
+        /* Fanetekst (inaktive faner) */
+        .stTabs [data-baseweb="tab"],
+        .stTabs [data-baseweb="tab"] * {{
+            color: #334155 !important;
+            font-weight: 700 !important;
+            font-size: 0.95rem !important;
+        }}
+
+        /* Aktiv fane (tydelig markert med hvit flate, ramme og mørk tekst) */
+        .stTabs [aria-selected="true"] {{
+            background-color: #FFFFFF !important;
+            border-radius: 8px !important;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important;
+        }}
+        .stTabs [aria-selected="true"] * {{
+            color: #0F172A !important;
+            font-weight: 900 !important;
+        }}
+
+        /* 5. Alle vanlige knapper */
         div.stButton > button, [data-testid="baseButton-secondary"], div.stFormSubmitButton > button {{
             background-color: #FFFFFF !important;
             border: 1.5px solid #94A3B8 !important;
             border-radius: 10px !important;
             box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
         }}
-
-        /* Tvinger teksten inni knapper til å være mørk koksgrå og fet */
         div.stButton > button *, [data-testid="baseButton-secondary"] *, div.stFormSubmitButton > button * {{
             color: #0F172A !important;
             font-weight: 700 !important;
         }}
-
-        /* Hover-effekt på vanlige knapper */
         div.stButton > button:hover, div.stFormSubmitButton > button:hover {{
             background-color: #F1F5F9 !important;
-            border-color: #475569 !important;
+            border-color: #334155 !important;
         }}
 
-        /* Primærknapper får solid blå bakgrunn og hvit skrift */
+        /* Primærknapper */
         div.stButton > button[kind="primary"], [data-testid="baseButton-primary"] {{
             background-color: #2563EB !important;
             border: none !important;
@@ -594,22 +635,8 @@ st.markdown(
             font-weight: 700 !important;
         }}
 
-        /* Fanelinjen */
-        .stTabs [data-baseweb="tab-list"] {{
-            background-color: rgba(255, 255, 255, 0.75) !important;
-            border-radius: 10px !important;
-            padding: 4px !important;
-            border: 1px solid rgba(0,0,0,0.06) !important;
-        }}
-
-        /* Faneknapper */
-        .stTabs [data-baseweb="tab"] {{
-            color: #334155 !important;
-            font-weight: 600 !important;
-        }}
-
-        /* All vanlig tekst på siden */
-        .stMarkdown p, .stMarkdown span, label {{
+        /* 6. All generell tekst, overskrifter og etiketter */
+        h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {{
             color: #0F172A !important;
         }}
     </style>
