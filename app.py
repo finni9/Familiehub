@@ -556,7 +556,7 @@ st.markdown(
             background-color: {t_stil['bg_color']} !important;
         }}
         
-        /* 2. Innholdskort og Expander-bokser (hvit flate med myk kant) */
+        /* 2. Expander-bokser og innholdskort */
         div[data-testid="stExpander"] {{
             background-color: #FFFFFF !important;
             border-radius: 12px !important;
@@ -564,8 +564,6 @@ st.markdown(
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
             margin-bottom: 10px !important;
         }}
-
-        /* 3. Tvinger mørk, fet skrift på ekspander-overskrifter (Oppslagstavle, Kalender etc.) */
         div[data-testid="stExpander"] summary,
         div[data-testid="stExpander"] summary *,
         div[data-testid="stExpander"] details summary span,
@@ -574,31 +572,25 @@ st.markdown(
             font-size: 1.05rem !important;
             font-weight: 800 !important;
         }}
-
-        /* Ikon-pilen i ekspanderne */
         div[data-testid="stExpander"] summary svg {{
             fill: #0F172A !important;
             stroke: #0F172A !important;
         }}
 
-        /* 4. Fanelinjen øverst */
+        /* 3. Faner */
         .stTabs [data-baseweb="tab-list"] {{
-            background-color: rgba(255, 255, 255, 0.85) !important;
+            background-color: rgba(255, 255, 255, 0.9) !important;
             border-radius: 12px !important;
             padding: 6px !important;
-            border: 1px solid rgba(15, 23, 42, 0.1) !important;
+            border: 1px solid rgba(15, 23, 42, 0.12) !important;
             gap: 4px !important;
         }}
-
-        /* Fanetekst (inaktive faner) */
         .stTabs [data-baseweb="tab"],
         .stTabs [data-baseweb="tab"] * {{
             color: #334155 !important;
             font-weight: 700 !important;
             font-size: 0.95rem !important;
         }}
-
-        /* Aktiv fane (tydelig markert med hvit flate, ramme og mørk tekst) */
         .stTabs [aria-selected="true"] {{
             background-color: #FFFFFF !important;
             border-radius: 8px !important;
@@ -609,7 +601,7 @@ st.markdown(
             font-weight: 900 !important;
         }}
 
-        /* 5. Alle vanlige knapper */
+        /* 4. Knapper */
         div.stButton > button, [data-testid="baseButton-secondary"], div.stFormSubmitButton > button {{
             background-color: #FFFFFF !important;
             border: 1.5px solid #94A3B8 !important;
@@ -635,7 +627,35 @@ st.markdown(
             font-weight: 700 !important;
         }}
 
-        /* 6. All generell tekst, overskrifter og etiketter */
+        /* 5. Skrivefelter, tekstboks og tallboks */
+        div[data-baseweb="input"] > div, input, textarea {{
+            background-color: #FFFFFF !important;
+            color: #0F172A !important;
+            -webkit-text-fill-color: #0F172A !important;
+            font-weight: 600 !important;
+        }}
+        input::placeholder, textarea::placeholder {{
+            color: #64748B !important;
+            -webkit-text-fill-color: #64748B !important;
+            opacity: 1 !important;
+        }}
+
+        /* 6. Checkboxer og radioknapper */
+        label[data-baseweb="checkbox"] *,
+        label[data-baseweb="radio"] *,
+        div[data-testid="stCheckbox"] label *,
+        div[data-testid="stRadio"] label * {{
+            color: #0F172A !important;
+            font-weight: 600 !important;
+        }}
+
+        /* 7. Undertekst og bildetekst (st.caption) */
+        [data-testid="stCaptionContainer"] p, small, .stCaption {{
+            color: #334155 !important;
+            font-weight: 600 !important;
+        }}
+
+        /* 8. All standardtekst */
         h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {{
             color: #0F172A !important;
         }}
@@ -1230,7 +1250,7 @@ with fane_middag:
                 ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
                 nytt_opp_bilde = st.file_uploader("Bilde av retten (valgfritt):", type=["png", "jpg", "jpeg"])
                 
-                if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
+                if st.form_submit_button("Lagre oppgave", use_container_width=True) and ny_r.strip():
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
