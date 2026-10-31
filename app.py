@@ -109,66 +109,66 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
-# ----------------- TEMA-ORDLISTE MED 6 TEMAER -----------------
+# ----------------- TEMA-ORDLISTE MED 6 TEMAER (FORSTERKET KONTRAST) -----------------
 TEMAER = {
     "🌅 Varm Solnedgang": {
-        "bg_color": "#FFF8F4",
-        "banner_bg": "linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #FFA8A8 100%)",
-        "tag_bg": "rgba(255, 255, 255, 0.28)",
+        "bg_color": "#FFE9DE",
+        "banner_bg": "linear-gradient(135deg, #FF5757 0%, #FF7A3D 50%, #FF9A76 100%)",
+        "tag_bg": "rgba(255, 255, 255, 0.32)",
         "tag_txt": "#FFFFFF",
         "tittel_farge": "#FFFFFF",
-        "sub_farge": "#FFF3E0",
-        "shadow": "0 4px 15px rgba(255, 107, 107, 0.25)",
+        "sub_farge": "#FFF4ED",
+        "shadow": "0 4px 16px rgba(255, 87, 87, 0.28)",
         "border": "none"
     },
     "🌊 Nordisk Havblå": {
-        "bg_color": "#F0F7FF",
-        "banner_bg": "linear-gradient(135deg, #1E3A8A 0%, #2563EB 60%, #38BDF8 100%)",
-        "tag_bg": "rgba(255, 255, 255, 0.18)",
+        "bg_color": "#DCEEFE",
+        "banner_bg": "linear-gradient(135deg, #1E3A8A 0%, #2563EB 60%, #0284C7 100%)",
+        "tag_bg": "rgba(255, 255, 255, 0.22)",
         "tag_txt": "#BAE6FD",
         "tittel_farge": "#FFFFFF",
         "sub_farge": "#E0F2FE",
-        "shadow": "0 4px 15px rgba(37, 99, 235, 0.22)",
+        "shadow": "0 4px 16px rgba(37, 99, 235, 0.25)",
         "border": "none"
     },
     "✨ Leken Stjernehimmel": {
-        "bg_color": "#F3F0FF",
-        "banner_bg": "linear-gradient(135deg, #312E81 0%, #4F46E5 50%, #7C3AED 100%)",
-        "tag_bg": "rgba(253, 224, 71, 0.2)",
+        "bg_color": "#E5DEFF",
+        "banner_bg": "linear-gradient(135deg, #2E1065 0%, #4338CA 50%, #6D28D9 100%)",
+        "tag_bg": "rgba(253, 224, 71, 0.25)",
         "tag_txt": "#FDE047",
         "tittel_farge": "#FDE047",
-        "sub_farge": "#E0E7FF",
-        "shadow": "0 4px 15px rgba(79, 70, 229, 0.25)",
-        "border": "2px solid rgba(253, 224, 71, 0.4)"
+        "sub_farge": "#EDE9FE",
+        "shadow": "0 4px 16px rgba(67, 56, 202, 0.3)",
+        "border": "2px solid rgba(253, 224, 71, 0.5)"
     },
     "🌲 Eventyrskog & Natur": {
-        "bg_color": "#F2F8F4",
-        "banner_bg": "linear-gradient(135deg, #064E3B 0%, #059669 60%, #34D399 100%)",
-        "tag_bg": "rgba(255, 255, 255, 0.20)",
+        "bg_color": "#D5EFE0",
+        "banner_bg": "linear-gradient(135deg, #064E3B 0%, #047857 60%, #10B981 100%)",
+        "tag_bg": "rgba(255, 255, 255, 0.25)",
         "tag_txt": "#D1FAE5",
         "tittel_farge": "#FFFFFF",
         "sub_farge": "#ECFDF5",
-        "shadow": "0 4px 15px rgba(5, 150, 105, 0.22)",
+        "shadow": "0 4px 16px rgba(4, 120, 87, 0.25)",
         "border": "none"
     },
     "🌸 Søt Lavendel & Blomst": {
-        "bg_color": "#FAF5FF",
-        "banner_bg": "linear-gradient(135deg, #86198F 0%, #C026D3 55%, #F472B6 100%)",
-        "tag_bg": "rgba(255, 255, 255, 0.22)",
+        "bg_color": "#FADCF4",
+        "banner_bg": "linear-gradient(135deg, #701A75 0%, #A21CAF 55%, #E879F9 100%)",
+        "tag_bg": "rgba(255, 255, 255, 0.25)",
         "tag_txt": "#FDF4FF",
         "tittel_farge": "#FFFFFF",
         "sub_farge": "#FCE7F3",
-        "shadow": "0 4px 15px rgba(192, 38, 211, 0.22)",
+        "shadow": "0 4px 16px rgba(162, 28, 175, 0.25)",
         "border": "none"
     },
     "☕ Kaffe & Lun Kos": {
-        "bg_color": "#FDFBF7",
+        "bg_color": "#EFE3D5",
         "banner_bg": "linear-gradient(135deg, #451A03 0%, #78350F 55%, #B45309 100%)",
-        "tag_bg": "rgba(255, 255, 255, 0.18)",
+        "tag_bg": "rgba(255, 255, 255, 0.22)",
         "tag_txt": "#FEF3C7",
         "tittel_farge": "#FFFFFF",
         "sub_farge": "#FFFBEB",
-        "shadow": "0 4px 15px rgba(120, 53, 15, 0.22)",
+        "shadow": "0 4px 16px rgba(120, 53, 15, 0.25)",
         "border": "none"
     }
 }
@@ -371,9 +371,9 @@ if "aktiv_familie" not in st.session_state:
 if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_familie"]:
     st.markdown(
         """
-        <div style="background-color: #EFF6FF; border-radius: 12px; padding: 22px; text-align: center; border: 1px solid #BFDBFE; margin-top: 20px;">
-            <h1 style="color: #1E3A8A; margin: 0; font-size: 1.8rem;">🏡 Familiehub</h1>
-            <p style="color: #3B82F6; font-size: 1.05rem; margin-top: 6px;">Logg inn i familiens hjem med navn og PIN-kode</p>
+        <div style="background-color: #FFFFFF; border-radius: 16px; padding: 26px; text-align: center; border: 2px solid #BFDBFE; box-shadow: 0 4px 12px rgba(0,0,0,0.06); margin-top: 20px;">
+            <h1 style="color: #1E3A8A; margin: 0; font-size: 1.9rem; font-weight: 900;">🏡 Familiehub</h1>
+            <p style="color: #3B82F6; font-size: 1.05rem; margin-top: 6px; font-weight: 600;">Logg inn i familiens hjem med navn og PIN-kode</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -541,19 +541,41 @@ def aapne_pin_dialog():
     if c_avbr.button("Avbryt", use_container_width=True):
         st.rerun()
 
-# ----------------- HENT TEMA & SETT BAKGRUNNSFARGE -----------------
+# ----------------- HENT TEMA & SETT BAKGRUNN MED SKARP KONTRAST -----------------
 valgt_tema = data.get("tema", "🌅 Varm Solnedgang")
 if valgt_tema not in TEMAER:
     valgt_tema = "🌅 Varm Solnedgang"
 
 t_stil = TEMAER[valgt_tema]
 
-# Sett hele sidens bakgrunnsfarge dynamisk basert på valgt tema
+# Injiser CSS som overstyrer bakgrunn og sikrer krystallklar tekst
 st.markdown(
     f"""
     <style>
-        .stApp {{
+        /* Tvinger farge på alle bakgrunnslag i Streamlit */
+        .stApp, [data-testid="stAppViewContainer"], .main {{
             background-color: {t_stil['bg_color']} !important;
+        }}
+        
+        /* Gjør innholdskort og expanders tydelige og skarpe mot bakgrunnen */
+        div[data-testid="stExpander"] {{
+            background-color: #FFFFFF !important;
+            border-radius: 12px !important;
+            border: 1px solid rgba(0, 0, 0, 0.08) !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+            margin-bottom: 8px !important;
+        }}
+
+        /* Sørger for at fanene skiller seg ut */
+        .stTabs [data-baseweb="tab-list"] {{
+            background-color: rgba(255, 255, 255, 0.6) !important;
+            border-radius: 10px !important;
+            padding: 4px !important;
+        }}
+
+        /* Sikrer at all brødtekst er dyp mørk og lettlest */
+        .stMarkdown, p, span, label {{
+            color: #0F172A !important;
         }}
     </style>
     """,
@@ -1290,7 +1312,7 @@ if er_forelder and fane_familie:
     with fane_familie:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
         
-        # 🎨 Velg tema med alle 6 bakgrunner
+        # 🎨 Velg tema med forsterkede bakgrunner
         with st.expander("🎨 **Utseende & Tema for Appen**", expanded=True):
             st.caption("Velg familiens favoritt-tema (endrer både bakgrunnsfargen og toppbanneret):")
             tema_alternativer = list(TEMAER.keys())
