@@ -111,34 +111,23 @@ FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
 st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
 
-# Skjul Streamlit standardmenyer, deploy-knapp og bunntekst
+# Skjul standard Streamlit-menyer og verktøylinje
 skjul_streamlit_elementer = """
 <style>
-    /* Skjuler hovedmenyen (hamburgermenyen) øverst til høyre */
     #MainMenu {visibility: hidden;}
-    
-    /* Skjuler topplinjen / verktøylinjen (Deploy-knappen og statusikon) */
     header {visibility: hidden;}
+    footer {visibility: hidden; display: none;}
     [data-testid="stToolbar"] {visibility: hidden; display: none;}
     [data-testid="stDecoration"] {visibility: hidden; display: none;}
     [data-testid="stStatusWidget"] {visibility: hidden; display: none;}
-    
-    /* Skjuler bunnteksten 'Made with Streamlit' */
-    footer {visibility: hidden; display: none;}
+    [data-testid="manage-app-button"] {display: none !important;}
+    div[class*="viewerBadge"] {display: none !important;}
 </style>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1E3A8A">
 """
 st.markdown(skjul_streamlit_elementer, unsafe_allow_html=True)
-
-# PWA-tilpasning i HTML for mobilvisning
-st.markdown(
-    """
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#EFF6FF">
-    """,
-    unsafe_allow_html=True
-)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -211,6 +200,7 @@ def standard_data(valgt_pin="1234"):
     return {
         "pin": str(valgt_pin),
         "sist_nullstilt": idag_str,
+        "tema": "🌅 Varm Solnedgang",
         "uke_oppgaver_lost": 0,
         "medlemmer": ["Far", "Mor", "Barn 1", "Barn 2"],
         "stjerne_brukere": ["Barn 1", "Barn 2"],
@@ -270,9 +260,8 @@ def lagre_familie_data(familie_navn, ny_data):
         df = hent_hele_tabellen()
         json_tekst = json.dumps(ny_data, ensure_ascii=False)
         
-        # Sikring mot Google Sheets cellestørrelse-grense (50k tegn)
         if len(json_tekst) > 48000:
-            st.error("⚠️ Datamengden er for stor for regnearket (for mange eller store bilder). Endringen ble ikke lagret.")
+            st.error("⚠️ Datamengden er for stor for regnearket. Endringen ble ikke lagret.")
             return False
         
         mask = df["familie_kode"].astype(str).str.lower() == str(familie_navn).lower()
@@ -392,6 +381,7 @@ if "sparemaal" not in raw_data: raw_data["sparemaal"] = {}
 if "aktiviteter" not in raw_data: raw_data["aktiviteter"] = STANDARD_AKTIVITETER
 if "fryser" not in raw_data: raw_data["fryser"] = []
 if "uke_oppgaver_lost" not in raw_data: raw_data["uke_oppgaver_lost"] = 0
+if "tema" not in raw_data: raw_data["tema"] = "🌅 Varm Solnedgang"
 
 raw_data["handleliste"] = migrer_handleliste(raw_data.get("handleliste", []))
 raw_data["middagsplan"] = migrer_middagsplan(raw_data.get("middagsplan", {}))
@@ -509,24 +499,67 @@ with st.sidebar:
             else:
                 st.error("Feil PIN-kode!")
 
-# ----------------- TOPPSTRIPE -----------------
+# ----------------- DYNAMISK TOPPSTRIPE BASERT PÅ TEMA -----------------
 naa = datetime.now(TIDSSONE_NORGE)
 dag_indeks = naa.weekday()
 idag_navn = DAGER[dag_indeks]
 dato_tekst = f"{idag_navn} {naa.day}. {MAANEDER[naa.month - 1]}"
 klokke_tekst = naa.strftime("%H:%M")
 
-st.markdown(
-    f"""
-    <div style="background-color: #EFF6FF; border-radius: 12px; padding: 12px; text-align: center; margin-bottom: 8px; border: 1px solid #BFDBFE;">
-        <h2 style="margin: 0; color: #1E3A8A; font-size: 1.5rem;">🏡 Familiehub ({aktiv_kode.capitalize()})</h2>
-        <div style="margin-top: 4px; font-size: 1.05rem; font-weight: 600; color: #1E40AF;">
+valgt_tema = data.get("tema", "🌅 Varm Solnedgang")
+
+if valgt_tema == "🌊 Nordisk Havblå":
+    banner_html = f"""
+    <div style="background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 60%, #38BDF8 100%); 
+                border-radius: 18px; padding: 18px 14px; text-align: center; margin-bottom: 12px; 
+                box-shadow: 0 6px 20px rgba(37, 99, 235, 0.25);">
+        <div style="display: inline-block; background: rgba(255, 255, 255, 0.18); 
+                    padding: 3px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 700; 
+                    color: #BAE6FD; margin-bottom: 6px;">
+            🌟 {aktiv_kode.capitalize()} HQ
+        </div>
+        <h2 style="margin: 0; color: #FFFFFF; font-size: 1.7rem; font-weight: 900; letter-spacing: -0.5px;">
+            🏡 Familiehub
+        </h2>
+        <div style="margin-top: 6px; font-size: 0.95rem; font-weight: 600; color: #E0F2FE;">
             📅 {dato_tekst} &nbsp;•&nbsp; ⏰ kl. {klokke_tekst}
         </div>
     </div>
-    """,
-    unsafe_allow_html=True
-)
+    """
+elif valgt_tema == "✨ Leken Stjernehimmel":
+    banner_html = f"""
+    <div style="background: linear-gradient(135deg, #312E81 0%, #4F46E5 50%, #7C3AED 100%); 
+                border-radius: 18px; padding: 18px 14px; text-align: center; margin-bottom: 12px; 
+                border: 2px solid rgba(253, 224, 71, 0.4); box-shadow: 0 6px 18px rgba(79, 70, 229, 0.3);">
+        <h2 style="margin: 0; color: #FDE047; font-size: 1.75rem; font-weight: 900; text-shadow: 0 2px 8px rgba(0,0,0,0.35);">
+            ⭐ {aktiv_kode.capitalize()} Familiehub ⭐
+        </h2>
+        <div style="margin-top: 6px; font-size: 0.95rem; font-weight: 600; color: #E0E7FF;">
+            📅 {dato_tekst} &nbsp;•&nbsp; ⏰ kl. {klokke_tekst}
+        </div>
+    </div>
+    """
+else:
+    # 🌅 Varm Solnedgang (Standard)
+    banner_html = f"""
+    <div style="background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #FFA8A8 100%); 
+                border-radius: 18px; padding: 18px 14px; text-align: center; margin-bottom: 12px; 
+                box-shadow: 0 6px 18px rgba(255, 107, 107, 0.28);">
+        <div style="display: inline-block; background: rgba(255, 255, 255, 0.28); backdrop-filter: blur(4px); 
+                    padding: 4px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 800; 
+                    color: #FFFFFF; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px;">
+            ✨ Familiens Hjem
+        </div>
+        <h2 style="margin: 2px 0 6px 0; color: #FFFFFF; font-size: 1.75rem; font-weight: 900; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+            🏡 Familiehub <span style="font-weight: 400; opacity: 0.95;">({aktiv_kode.capitalize()})</span>
+        </h2>
+        <div style="font-size: 0.95rem; font-weight: 600; color: #FFF3E0; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+            📅 {dato_tekst} &nbsp;•&nbsp; ⏰ {klokke_tekst}
+        </div>
+    </div>
+    """
+
+st.markdown(banner_html, unsafe_allow_html=True)
 
 # ----------------- KALENDER -----------------
 with st.expander("🗓️ **Familiens Kalender & Merkedager**", expanded=False):
@@ -1218,6 +1251,32 @@ if er_forelder and fane_familie:
     with fane_familie:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
         
+        # 🎨 Velg tema for Familiehuben
+        with st.expander("🎨 **Utseende & Tema for Toppstripen**", expanded=True):
+            st.caption("Velg hvilken visuell stil og farger som skal vises på toppen av appen for hele familien:")
+            tema_alternativer = [
+                "🌅 Varm Solnedgang", 
+                "🌊 Nordisk Havblå", 
+                "✨ Leken Stjernehimmel"
+            ]
+            naavaerende_tema = data.get("tema", "🌅 Varm Solnedgang")
+            if naavaerende_tema not in tema_alternativer:
+                naavaerende_tema = "🌅 Varm Solnedgang"
+                
+            valgt_nytt_tema = st.radio(
+                "Velg stil:", 
+                tema_alternativer, 
+                index=tema_alternativer.index(naavaerende_tema)
+            )
+            
+            if valgt_nytt_tema != data.get("tema"):
+                data["tema"] = valgt_nytt_tema
+                lagre_naa()
+                st.toast(f"Tema oppdatert til {valgt_nytt_tema}! 🎉")
+                st.rerun()
+
+        st.divider()
+
         # Endre navn på familiehuben
         with st.expander("🏷️ **Endre navnet på Familiehuben**", expanded=False):
             st.caption("Dette endrer både navnet som vises øverst og kallenavnet dere bruker ved innlogging.")
