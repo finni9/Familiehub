@@ -111,6 +111,24 @@ FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
 st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
 
+# Skjul Streamlit standardmenyer, deploy-knapp og bunntekst
+skjul_streamlit_elementer = """
+<style>
+    /* Skjuler hovedmenyen (hamburgermenyen) øverst til høyre */
+    #MainMenu {visibility: hidden;}
+    
+    /* Skjuler topplinjen / verktøylinjen (Deploy-knappen og statusikon) */
+    header {visibility: hidden;}
+    [data-testid="stToolbar"] {visibility: hidden; display: none;}
+    [data-testid="stDecoration"] {visibility: hidden; display: none;}
+    [data-testid="stStatusWidget"] {visibility: hidden; display: none;}
+    
+    /* Skjuler bunnteksten 'Made with Streamlit' */
+    footer {visibility: hidden; display: none;}
+</style>
+"""
+st.markdown(skjul_streamlit_elementer, unsafe_allow_html=True)
+
 # PWA-tilpasning i HTML for mobilvisning
 st.markdown(
     """
