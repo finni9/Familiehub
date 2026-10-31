@@ -62,12 +62,12 @@ STANDARD_BASISVARER = [
 
 STANDARD_AKTIVITETER = [
     "🎲 Spille brettspill sammen",
-    "🍿 Lage popcorn og ha filmkveld",
+    "🍿 Lage popcorn og se en god familiefilm",
     "🌲 Gå på oppdagelsestur i skogen eller fjæra",
     "🏕️ Bygge teppehytte i stua",
     "🧁 Bake boller eller muffins sammen",
     "🚲 Ta en sykkeltur eller sparkesykkel-race",
-    "🎨 Tegnekonkurranse eller maleboder",
+    "🎨 Tegnekonkurranse eller malebord",
     "⚽ Fotballtriks eller lek på plenen"
 ]
 
@@ -110,6 +110,17 @@ MAANEDER = [
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
 st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
+
+# PWA-tilpasning i HTML for mobilvisning
+st.markdown(
+    """
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#EFF6FF">
+    """,
+    unsafe_allow_html=True
+)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -189,8 +200,8 @@ def standard_data(valgt_pin="1234"):
         "sparemaal": {},
         "aktiviteter": STANDARD_AKTIVITETER,
         "fryser": [
-            {"id": str(uuid.uuid4()), "navn": "Laksefilet (4 pk)", "kategori": "Middag"},
-            {"id": str(uuid.uuid4()), "navn": "Hjemmelaget Bolognese", "kategori": "Middag"}
+            {"id": str(uuid.uuid4()), "navn": "Laksefilet (4 pk)"},
+            {"id": str(uuid.uuid4()), "navn": "Hjemmelaget Bolognese"}
         ],
         "beskjeder": [
             {"id": str(uuid.uuid4()), "tekst": "Velkommen til Familiehuben! 🌟", "fra": "Familien", "tid": "Kl. 08:00"}
@@ -241,8 +252,9 @@ def lagre_familie_data(familie_navn, ny_data):
         df = hent_hele_tabellen()
         json_tekst = json.dumps(ny_data, ensure_ascii=False)
         
+        # Sikring mot Google Sheets cellestørrelse-grense (50k tegn)
         if len(json_tekst) > 48000:
-            st.error("⚠️ Datamengden er for stor for regnearket. Handlingen ble ikke lagret.")
+            st.error("⚠️ Datamengden er for stor for regnearket (for mange eller store bilder). Endringen ble ikke lagret.")
             return False
         
         mask = df["familie_kode"].astype(str).str.lower() == str(familie_navn).lower()
@@ -276,7 +288,7 @@ def endre_familie_navn(gammelt_navn, nytt_navn):
     except Exception as e:
         return False, f"Feil ved oppdatering i Google Sheets: {e}"
 
-# ----------------- INNLOGGING -----------------
+# ----------------- INNLOGGING MED AUTO-REMEMBER -----------------
 url_params = st.query_params
 
 if "aktiv_familie" not in st.session_state:
@@ -334,13 +346,13 @@ if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_famili
                         st.error(f"Familienavnet '{f_navn}' er allerede opptatt! Vennligst velg et annet kallenavn.")
                     else:
                         ny_fam = standard_data(valgt_pin=f_pin)
-                        lagre_familie_data(f_navn, ny_fam)
-                        st.session_state["aktiv_familie"] = f_navn.lower()
-                        if husk_meg:
-                            st.query_params["fam"] = f_navn.lower()
-                            st.query_params["key"] = f_pin
-                        st.success(f"Familien {f_navn} er opprettet! Åpner huben...")
-                        st.rerun()
+                        if lagre_familie_data(f_navn, ny_fam):
+                            st.session_state["aktiv_familie"] = f_navn.lower()
+                            if husk_meg:
+                                st.query_params["fam"] = f_navn.lower()
+                                st.query_params["key"] = f_pin
+                            st.success(f"Familien {f_navn} er opprettet! Åpner huben...")
+                            st.rerun()
 
     st.stop()
 
@@ -618,7 +630,6 @@ with fane_oppgaver:
     medlemmer = data.get("medlemmer", [])
     stjerne_brukere = data.get("stjerne_brukere", [])
 
-    # 🏆 FUNKSJON 5: UKENS STJERNEDIPLOM
     with st.expander("🏆 **Ukens Stjernediplom (Trykk for å feire)**", expanded=False):
         antall_lost = data.get("uke_oppgaver_lost", 0)
         st.markdown(
@@ -640,7 +651,6 @@ with fane_oppgaver:
         if st.button("🎉 Skyt opp konfetti!", use_container_width=True):
             st.balloons()
 
-    # Visuell stjernetavle
     if stjerne_brukere:
         st.markdown("#### 🌟 Familiens Stjernetavle")
         kolonner = st.columns(len(stjerne_brukere))
@@ -657,7 +667,6 @@ with fane_oppgaver:
                     stjerne_symboler = "⭐" * synlige
                     pluss_tekst = f" <span style='font-size: 0.8rem; font-weight: 700; color: #854D0E;'>(+{antall_stjerner - 10})</span>" if antall_stjerner > 10 else ""
                     
-                    # Sjekk personlig sparemål først
                     p_maal = data.get("sparemaal", {}).get(person)
                     if p_maal:
                         mangler = p_maal["pris"] - antall_stjerner
@@ -838,7 +847,6 @@ with fane_butikk:
     st.subheader("🎯 Barnas Sparemål")
     stjerne_brukere = data.get("stjerne_brukere", [])
 
-    # 🎯 FUNKSJON 1: SPAREMÅL MED FREMDRIFTSLINJE
     if stjerne_brukere:
         for p in stjerne_brukere:
             saldo = data["poeng"].get(p, 0)
@@ -920,7 +928,6 @@ with fane_butikk:
 
 # ----------------- FANE 3: MIDDAG & FRYSER -----------------
 with fane_middag:
-    # 🧊 FUNKSJON 3: FRYSER- OG MATSKAPOVERSIKT
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
         fryser_varer = data.get("fryser", [])
         slett_f_id = None
@@ -930,7 +937,6 @@ with fane_middag:
                 c_fn, c_fknapp, c_fslett = st.columns([0.55, 0.30, 0.15])
                 c_fn.markdown(f"📦 **{fv['navn']}**")
                 
-                # Knapp for å sette direkte på dagens middag
                 if c_fknapp.button("Til middagsplan", key=f"fryser_bruk_{fv['id']}"):
                     data["middagsplan"][idag_navn] = fv["navn"]
                     st.session_state[f"rett_{idag_navn}"] = fv["navn"]
@@ -1139,12 +1145,11 @@ with fane_handleliste:
             lagre_naa()
             st.rerun()
 
-# ----------------- FANE 5: AKTIVITETER (LYKKEHJUL) -----------------
+# ----------------- FANE 5: AKTIVITETER -----------------
 with fane_aktiviteter:
     st.subheader("🎲 Hva skal vi finne på?")
     st.caption("Trykk på knappen for å trekke en morsom idé til hva familien kan gjøre sammen!")
 
-    # 🎲 FUNKSJON 2: AKTIVITETSVELGER
     aktiviteter = data.get("aktiviteter", STANDARD_AKTIVITETER)
     
     if st.button("🎰 Trekk en tilfeldig aktivitet!", use_container_width=True):
