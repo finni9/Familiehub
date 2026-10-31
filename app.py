@@ -60,6 +60,17 @@ STANDARD_BASISVARER = [
     {"id": "b6", "label": "☕ Kaffe", "navn": "Kaffe", "kategori": "🍞 Tørrvare, Krydder & Kolonial"},
 ]
 
+STANDARD_AKTIVITETER = [
+    "🎲 Spille brettspill sammen",
+    "🍿 Lage popcorn og ha filmkveld",
+    "🌲 Gå på oppdagelsestur i skogen eller fjæra",
+    "🏕️ Bygge teppehytte i stua",
+    "🧁 Bake boller eller muffins sammen",
+    "🚲 Ta en sykkeltur eller sparkesykkel-race",
+    "🎨 Tegnekonkurranse eller maleboder",
+    "⚽ Fotballtriks eller lek på plenen"
+]
+
 KATEGORI_REGLER = {
     "🥦 Frukt & Grønt": [
         "potet", "gulrot", "løk", "hvitløk", "mais", "agurk", "tomat", "sitron", 
@@ -106,7 +117,6 @@ def bilde_til_base64(opplastet_fil):
     try:
         bilde = Image.open(opplastet_fil)
         bilde = bilde.convert("RGB")
-        # Komprimer litt mer for å aldri sprenge Google Sheets' 50k tegn per celle
         max_str = 400
         if max(bilde.size) > max_str:
             bilde.thumbnail((max_str, max_str), Image.Resampling.LANCZOS)
@@ -172,9 +182,16 @@ def standard_data(valgt_pin="1234"):
     return {
         "pin": str(valgt_pin),
         "sist_nullstilt": idag_str,
+        "uke_oppgaver_lost": 0,
         "medlemmer": ["Far", "Mor", "Barn 1", "Barn 2"],
         "stjerne_brukere": ["Barn 1", "Barn 2"],
         "poeng": {"Far": 0, "Mor": 0, "Barn 1": 0, "Barn 2": 0},
+        "sparemaal": {},
+        "aktiviteter": STANDARD_AKTIVITETER,
+        "fryser": [
+            {"id": str(uuid.uuid4()), "navn": "Laksefilet (4 pk)", "kategori": "Middag"},
+            {"id": str(uuid.uuid4()), "navn": "Hjemmelaget Bolognese", "kategori": "Middag"}
+        ],
         "beskjeder": [
             {"id": str(uuid.uuid4()), "tekst": "Velkommen til Familiehuben! 🌟", "fra": "Familien", "tid": "Kl. 08:00"}
         ],
@@ -224,9 +241,8 @@ def lagre_familie_data(familie_navn, ny_data):
         df = hent_hele_tabellen()
         json_tekst = json.dumps(ny_data, ensure_ascii=False)
         
-        # Sikkerhetssjekk mot cellestørrelse i Google Sheets (maks 50k tegn)
         if len(json_tekst) > 48000:
-            st.error("⚠️ Datamengden er for stor for regnearket (for mange eller store bilder). Bildet ble ikke lagret.")
+            st.error("⚠️ Datamengden er for stor for regnearket. Handlingen ble ikke lagret.")
             return False
         
         mask = df["familie_kode"].astype(str).str.lower() == str(familie_navn).lower()
@@ -260,7 +276,7 @@ def endre_familie_navn(gammelt_navn, nytt_navn):
     except Exception as e:
         return False, f"Feil ved oppdatering i Google Sheets: {e}"
 
-# ----------------- INNLOGGING MED AUTO-REMEMBER -----------------
+# ----------------- INNLOGGING -----------------
 url_params = st.query_params
 
 if "aktiv_familie" not in st.session_state:
@@ -342,13 +358,18 @@ if "merkedager" not in raw_data: raw_data["merkedager"] = []
 if "oppskrifter" not in raw_data: raw_data["oppskrifter"] = STANDARD_MIDDAGER
 else: raw_data["oppskrifter"] = migrer_oppskrifter(raw_data["oppskrifter"])
 if "basisvarer" not in raw_data: raw_data["basisvarer"] = STANDARD_BASISVARER
+if "sparemaal" not in raw_data: raw_data["sparemaal"] = {}
+if "aktiviteter" not in raw_data: raw_data["aktiviteter"] = STANDARD_AKTIVITETER
+if "fryser" not in raw_data: raw_data["fryser"] = []
+if "uke_oppgaver_lost" not in raw_data: raw_data["uke_oppgaver_lost"] = 0
+
 raw_data["handleliste"] = migrer_handleliste(raw_data.get("handleliste", []))
 raw_data["middagsplan"] = migrer_middagsplan(raw_data.get("middagsplan", {}))
 
 data = raw_data
 
 def lagre_naa():
-    lagre_familie_data(aktiv_kode, data)
+    return lagre_familie_data(aktiv_kode, data)
 
 # ----------------- MIDNATT-NULLSTILLING -----------------
 idag_dato = datetime.now(TIDSSONE_NORGE).date()
@@ -412,6 +433,7 @@ def cb_start_ny_uke():
     for dag in DAGER:
         data["middagsplan"][dag] = ""
         st.session_state[f"rett_{dag}"] = ""
+    data["uke_oppgaver_lost"] = 0
     lagre_naa()
 
 for dag in DAGER:
@@ -457,7 +479,7 @@ with st.sidebar:
             else:
                 st.error("Feil PIN-kode!")
 
-# ----------------- TOPPSTRIPE & KALENDER -----------------
+# ----------------- TOPPSTRIPE -----------------
 naa = datetime.now(TIDSSONE_NORGE)
 dag_indeks = naa.weekday()
 idag_navn = DAGER[dag_indeks]
@@ -476,7 +498,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-with st.expander("🗓️ **Familiens Kalender & Merkedager (Trykk her)**", expanded=False):
+# ----------------- KALENDER -----------------
+with st.expander("🗓️ **Familiens Kalender & Merkedager**", expanded=False):
     merkedager = data.get("merkedager", [])
     slett_merkedag_id = None
     
@@ -581,24 +604,43 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
 
 er_forelder = st.session_state["foreldremodus"]
 
-fane_navn = ["⭐ Oppgaver", "🎁 Butikk", "🍽️ Middag", "🛒 Handleliste"]
+fane_navn = ["⭐ Oppgaver", "🎁 Butikk & Mål", "🍽️ Middag & Fryser", "🛒 Handleliste", "🎲 Aktiviteter"]
 if er_forelder: fane_navn.append("👨‍👩‍👧‍👦 Admin")
 
 faner = st.tabs(fane_navn)
-fane_oppgaver, fane_butikk, fane_middag, fane_handleliste = faner[0], faner[1], faner[2], faner[3]
-fane_familie = faner[4] if er_forelder else None
+fane_oppgaver, fane_butikk, fane_middag, fane_handleliste, fane_aktiviteter = faner[0], faner[1], faner[2], faner[3], faner[4]
+fane_familie = faner[5] if er_forelder else None
 
-# ----------------- FANE 1: OPPGAVER & VISUELL STJERNETAVLE -----------------
+# ----------------- FANE 1: OPPGAVER & DIPLOM -----------------
 with fane_oppgaver:
     oppgaver_oppdatert = False
     slett_id = None
     medlemmer = data.get("medlemmer", [])
     stjerne_brukere = data.get("stjerne_brukere", [])
 
-    billigste_premie = None
-    if data.get("belonninger"):
-        billigste_premie = min(data["belonninger"], key=lambda x: x["pris"])
+    # 🏆 FUNKSJON 5: UKENS STJERNEDIPLOM
+    with st.expander("🏆 **Ukens Stjernediplom (Trykk for å feire)**", expanded=False):
+        antall_lost = data.get("uke_oppgaver_lost", 0)
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); 
+                        border: 3px dashed #F59E0B; border-radius: 16px; padding: 18px; text-align: center; margin-bottom: 8px;">
+                <div style="font-size: 2.2rem;">🎖️ 📜 🌟</div>
+                <h3 style="color: #92400E; margin: 4px 0 2px 0;">Ukens Superinnsats!</h3>
+                <p style="color: #B45309; font-size: 1.05rem; margin-bottom: 8px;">
+                    Familien har løst hele <b>{antall_lost} oppgaver</b> sammen denne uken!
+                </p>
+                <div style="font-size: 0.9rem; color: #78350F;">
+                    {' ⭐ '.join([f'<b>{p}:</b> {data["poeng"].get(p, 0)} ⭐' for p in stjerne_brukere])}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        if st.button("🎉 Skyt opp konfetti!", use_container_width=True):
+            st.balloons()
 
+    # Visuell stjernetavle
     if stjerne_brukere:
         st.markdown("#### 🌟 Familiens Stjernetavle")
         kolonner = st.columns(len(stjerne_brukere))
@@ -615,13 +657,16 @@ with fane_oppgaver:
                     stjerne_symboler = "⭐" * synlige
                     pluss_tekst = f" <span style='font-size: 0.8rem; font-weight: 700; color: #854D0E;'>(+{antall_stjerner - 10})</span>" if antall_stjerner > 10 else ""
                     
-                    motivasjon = ""
-                    if billigste_premie:
-                        mangler = billigste_premie["pris"] - antall_stjerner
+                    # Sjekk personlig sparemål først
+                    p_maal = data.get("sparemaal", {}).get(person)
+                    if p_maal:
+                        mangler = p_maal["pris"] - antall_stjerner
                         if mangler <= 0:
-                            motivasjon = f"<div style='font-size: 0.75rem; color: #047857; font-weight: 700; margin-top: 4px;'>🎉 Råd til {billigste_premie['tittel']}!</div>"
+                            motivasjon = f"<div style='font-size: 0.75rem; color: #047857; font-weight: 700; margin-top: 4px;'>🎯 Målet nådd: {p_maal['tittel']}!</div>"
                         else:
-                            motivasjon = f"<div style='font-size: 0.72rem; color: #B45309; margin-top: 4px;'>🎯 Bare <b>{mangler} ⭐</b> til {billigste_premie['tittel']}</div>"
+                            motivasjon = f"<div style='font-size: 0.72rem; color: #B45309; margin-top: 4px;'>🎯 <b>{mangler} ⭐</b> til {p_maal['tittel']}</div>"
+                    else:
+                        motivasjon = ""
 
                 st.markdown(
                     f"""
@@ -653,7 +698,7 @@ with fane_oppgaver:
             st.rerun()
     with c_uke:
         if er_forelder:
-            st.button("🗓️ Start ny uke", on_click=cb_start_ny_uke, use_container_width=True)
+            st.button("🗓️ Start ny uke (Nullstill diplom)", on_click=cb_start_ny_uke, use_container_width=True)
         else:
             st.caption("🔒 Ny uke krever PIN")
 
@@ -685,12 +730,15 @@ with fane_oppgaver:
                     if er_ferdig:
                         if er_samler:
                             data["poeng"][person] = data["poeng"].get(person, 0) + stjerner
+                            data["uke_oppgaver_lost"] = data.get("uke_oppgaver_lost", 0) + 1
                             st.balloons()
                     else:
-                        if er_samler: data["poeng"][person] = max(0, data["poeng"].get(person, 0) - stjerner)
+                        if er_samler:
+                            data["poeng"][person] = max(0, data["poeng"].get(person, 0) - stjerner)
+                            data["uke_oppgaver_lost"] = max(0, data.get("uke_oppgaver_lost", 1) - 1)
                     oppgaver_oppdatert = True
 
-    # FELLESOPPGAVER
+    # Fellesoppgaver
     felles_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == FELLES_VALG]
     if felles_oppgaver:
         with st.expander(f"🤝 **Fellesoppgaver** ({len(felles_oppgaver)})", expanded=True):
@@ -743,6 +791,7 @@ with fane_oppgaver:
                             if h in stjerne_brukere:
                                 data["poeng"][h] = data["poeng"].get(h, 0) + stjerner_hver
                         
+                        data["uke_oppgaver_lost"] = data.get("uke_oppgaver_lost", 0) + 1
                         st.balloons()
                         st.toast(f"🎉 Samarbeidsbonus! +{stjerner_hver} ⭐ til hver.")
                     else:
@@ -753,6 +802,7 @@ with fane_oppgaver:
                             if h in stjerne_brukere:
                                 data["poeng"][h] = max(0, data["poeng"].get(h, 0) - trekk_hver)
                         oppg["fullfort_av"] = None
+                        data["uke_oppgaver_lost"] = max(0, data.get("uke_oppgaver_lost", 1) - 1)
 
                     oppgaver_oppdatert = True
 
@@ -771,7 +821,7 @@ with fane_oppgaver:
             with st.form("form_ny_oppg", clear_on_submit=True):
                 oppg_tekst = st.text_input("Gjøremål:")
                 valgte = st.multiselect("Til hvem?", [FELLES_VALG] + medlemmer, default=[medlemmer[0]] if medlemmer else [])
-                stjerner = st.number_input("Stjerner (ved fellesoppgaver deles disse på hjelperne):", min_value=1, max_value=20, value=2)
+                stjerner = st.number_input("Stjerner (deles ved fellesoppgave):", min_value=1, max_value=20, value=2)
                 er_daglig = st.checkbox("🔄 Daglig rutine", value=True)
                 if st.form_submit_button("Lagre oppgave", use_container_width=True) and oppg_tekst.strip() and valgte:
                     for p in valgte:
@@ -783,10 +833,53 @@ with fane_oppgaver:
                     st.toast("Oppgave lagt til!")
                     st.rerun()
 
-# ----------------- FANE 2: BUTIKK -----------------
+# ----------------- FANE 2: BUTIKK & SPAREMÅL -----------------
 with fane_butikk:
-    st.subheader("🎁 Belønningsbutikk")
+    st.subheader("🎯 Barnas Sparemål")
     stjerne_brukere = data.get("stjerne_brukere", [])
+
+    # 🎯 FUNKSJON 1: SPAREMÅL MED FREMDRIFTSLINJE
+    if stjerne_brukere:
+        for p in stjerne_brukere:
+            saldo = data["poeng"].get(p, 0)
+            maal_info = data.get("sparemaal", {}).get(p)
+            
+            with st.container():
+                if maal_info:
+                    maal_tittel = maal_info.get("tittel", "Mål")
+                    maal_pris = max(1, int(maal_info.get("pris", 10)))
+                    framgang = min(1.0, saldo / maal_pris)
+                    prosent = int(framgang * 100)
+                    
+                    st.markdown(f"**👤 {p} sparer til: {maal_tittel}** (`{saldo} / {maal_pris} ⭐` — {prosent}%)")
+                    st.progress(framgang)
+                    
+                    c_m1, c_m2 = st.columns([0.65, 0.35])
+                    with c_m1:
+                        if saldo >= maal_pris:
+                            st.success(f"🎉 Målet er nådd! {p} kan løse det inn!")
+                        else:
+                            st.caption(f"Mangler {maal_pris - saldo} ⭐ før målet nås.")
+                    with c_m2:
+                        if st.button("Fjern mål ✕", key=f"slett_maal_{p}"):
+                            del data["sparemaal"][p]
+                            lagre_naa()
+                            st.rerun()
+                else:
+                    st.info(f"👤 {p} har ikke satt noe sparemål enda.")
+                    with st.expander(f"➕ Sett sparemål for {p}"):
+                        with st.form(f"form_maal_{p}"):
+                            ny_m_tittel = st.text_input("Hva sparer du til?", placeholder="f.eks. Lego-sett, Tur til badeland")
+                            ny_m_pris = st.number_input("Hvor mange stjerner koster det?", min_value=1, max_value=200, value=25)
+                            if st.form_submit_button("Start sparing! 🚀") and ny_m_tittel.strip():
+                                if "sparemaal" not in data: data["sparemaal"] = {}
+                                data["sparemaal"][p] = {"tittel": ny_m_tittel.strip(), "pris": int(ny_m_pris)}
+                                lagre_naa()
+                                st.rerun()
+                st.write("")
+
+    st.write("---")
+    st.subheader("🎁 Belønningsbutikk")
     if stjerne_brukere:
         saldo_tekst = " | ".join([f"**{p}:** {data['poeng'].get(p, 0)} ⭐" for p in stjerne_brukere])
         st.info(f"💳 {saldo_tekst}")
@@ -825,8 +918,45 @@ with fane_butikk:
                     lagre_naa()
                     st.rerun()
 
-# ----------------- FANE 3: MIDDAG MED BILDER -----------------
+# ----------------- FANE 3: MIDDAG & FRYSER -----------------
 with fane_middag:
+    # 🧊 FUNKSJON 3: FRYSER- OG MATSKAPOVERSIKT
+    with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
+        fryser_varer = data.get("fryser", [])
+        slett_f_id = None
+        
+        if fryser_varer:
+            for fv in fryser_varer:
+                c_fn, c_fknapp, c_fslett = st.columns([0.55, 0.30, 0.15])
+                c_fn.markdown(f"📦 **{fv['navn']}**")
+                
+                # Knapp for å sette direkte på dagens middag
+                if c_fknapp.button("Til middagsplan", key=f"fryser_bruk_{fv['id']}"):
+                    data["middagsplan"][idag_navn] = fv["navn"]
+                    st.session_state[f"rett_{idag_navn}"] = fv["navn"]
+                    lagre_naa()
+                    st.toast(f"Satt {fv['navn']} som middag i dag! 🍽️")
+                    st.rerun()
+
+                if c_fslett.button("✕", key=f"fryser_del_{fv['id']}"):
+                    slett_f_id = fv["id"]
+
+            if slett_f_id:
+                data["fryser"] = [x for x in data["fryser"] if x["id"] != slett_f_id]
+                lagre_naa()
+                st.rerun()
+        else:
+            st.caption("Ingen varer registrert i fryseren.")
+
+        st.write("---")
+        with st.form("form_ny_fryser_vare", clear_on_submit=True):
+            ny_f_tekst = st.text_input("Vare i fryser/matskap:", placeholder="f.eks. Kjøttkaker 2 pk, Laks 500g")
+            if st.form_submit_button("Legg i fryseren 🧊", use_container_width=True) and ny_f_tekst.strip():
+                data["fryser"].append({"id": str(uuid.uuid4()), "navn": ny_f_tekst.strip()})
+                lagre_naa()
+                st.rerun()
+
+    st.write("---")
     oppskrifter = data.get("oppskrifter", STANDARD_MIDDAGER)
     oppskriftsliste = sorted(list(oppskrifter.keys()))
 
@@ -928,7 +1058,7 @@ with fane_middag:
                         st.toast(f"{ny_r.strip()} er lagt til!")
                         st.rerun()
 
-# ----------------- FANE 4: HANDLELISTE MED HURTIGVALG -----------------
+# ----------------- FANE 4: HANDLELISTE -----------------
 with fane_handleliste:
     st.subheader("🛒 Handleliste")
 
@@ -1009,12 +1139,63 @@ with fane_handleliste:
             lagre_naa()
             st.rerun()
 
-# ----------------- FANE 5: FAMILIEADMIN -----------------
+# ----------------- FANE 5: AKTIVITETER (LYKKEHJUL) -----------------
+with fane_aktiviteter:
+    st.subheader("🎲 Hva skal vi finne på?")
+    st.caption("Trykk på knappen for å trekke en morsom idé til hva familien kan gjøre sammen!")
+
+    # 🎲 FUNKSJON 2: AKTIVITETSVELGER
+    aktiviteter = data.get("aktiviteter", STANDARD_AKTIVITETER)
+    
+    if st.button("🎰 Trekk en tilfeldig aktivitet!", use_container_width=True):
+        if aktiviteter:
+            valgt_akt = random.choice(aktiviteter)
+            st.session_state["trukket_aktivitet"] = valgt_akt
+            st.balloons()
+        else:
+            st.warning("Ingen aktiviteter på listen!")
+
+    if "trukket_aktivitet" in st.session_state:
+        st.markdown(
+            f"""
+            <div style="background-color: #ECFDF5; border: 2px solid #10B981; border-radius: 12px; padding: 18px; text-align: center; margin: 14px 0;">
+                <div style="font-size: 1.1rem; color: #047857; font-weight: 800;">Dagens utvalgte aktivitet:</div>
+                <div style="font-size: 1.45rem; font-weight: 900; color: #065F46; margin-top: 6px;">
+                    {st.session_state['trukket_aktivitet']}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.write("---")
+    with st.expander("📝 Se og rediger aktivitetslisten"):
+        slett_akt = None
+        for a_tekst in aktiviteter:
+            c_at, c_adel = st.columns([0.85, 0.15])
+            c_at.write(a_tekst)
+            if c_adel.button("✕", key=f"del_akt_{a_tekst}"):
+                slett_akt = a_tekst
+        
+        if slett_akt:
+            data["aktiviteter"].remove(slett_akt)
+            lagre_naa()
+            st.rerun()
+
+        with st.form("form_ny_akt", clear_on_submit=True):
+            ny_akt = st.text_input("Legg til en ny aktivitet:", placeholder="f.eks. Dra i svømmehallen")
+            if st.form_submit_button("Legg til aktivitet", use_container_width=True) and ny_akt.strip():
+                if ny_akt.strip() not in data["aktiviteter"]:
+                    data["aktiviteter"].append(ny_akt.strip())
+                    lagre_naa()
+                    st.rerun()
+
+# ----------------- FANE 6: ADMIN -----------------
 if er_forelder and fane_familie:
     with fane_familie:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
         
-        # 1. Endre navn på familiehuben
+        # Endre navn på familiehuben
         with st.expander("🏷️ **Endre navnet på Familiehuben**", expanded=False):
             st.caption("Dette endrer både navnet som vises øverst og kallenavnet dere bruker ved innlogging.")
             with st.form("form_endre_fam_navn"):
@@ -1034,7 +1215,7 @@ if er_forelder and fane_familie:
 
         st.divider()
 
-        # 2. Familiemedlemmer
+        # Familiemedlemmer
         st.markdown("#### 👤 Familiemedlemmer")
         for i, person in enumerate(list(data["medlemmer"])):
             st.markdown(f"**Person {i+1}: {person}**")
@@ -1088,7 +1269,7 @@ if er_forelder and fane_familie:
 
         st.divider()
 
-        # 3. Hurtigknapper for basisvarer
+        # Hurtigknapper for basisvarer
         st.markdown("#### ⚡ Administrer Hurtigknapper for basisvarer")
         st.caption("Her bestemmer mor og far hvilke knapper som dukker opp øverst på handlelisten.")
         
