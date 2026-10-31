@@ -109,72 +109,9 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
-# ----------------- TEMA-ORDLISTE MED 6 TEMAER -----------------
-TEMAER = {
-    "🌅 Varm Solnedgang": {
-        "bg_color": "#FFE9DE",
-        "banner_bg": "linear-gradient(135deg, #FF5757 0%, #FF7A3D 50%, #FF9A76 100%)",
-        "tag_bg": "rgba(255, 255, 255, 0.32)",
-        "tag_txt": "#FFFFFF",
-        "tittel_farge": "#FFFFFF",
-        "sub_farge": "#FFF4ED",
-        "shadow": "0 4px 16px rgba(255, 87, 87, 0.28)",
-        "border": "none"
-    },
-    "🌊 Nordisk Havblå": {
-        "bg_color": "#DCEEFE",
-        "banner_bg": "linear-gradient(135deg, #1E3A8A 0%, #2563EB 60%, #0284C7 100%)",
-        "tag_bg": "rgba(255, 255, 255, 0.22)",
-        "tag_txt": "#BAE6FD",
-        "tittel_farge": "#FFFFFF",
-        "sub_farge": "#E0F2FE",
-        "shadow": "0 4px 16px rgba(37, 99, 235, 0.25)",
-        "border": "none"
-    },
-    "✨ Leken Stjernehimmel": {
-        "bg_color": "#E5DEFF",
-        "banner_bg": "linear-gradient(135deg, #2E1065 0%, #4338CA 50%, #6D28D9 100%)",
-        "tag_bg": "rgba(253, 224, 71, 0.25)",
-        "tag_txt": "#FDE047",
-        "tittel_farge": "#FDE047",
-        "sub_farge": "#EDE9FE",
-        "shadow": "0 4px 16px rgba(67, 56, 202, 0.3)",
-        "border": "2px solid rgba(253, 224, 71, 0.5)"
-    },
-    "🌲 Eventyrskog & Natur": {
-        "bg_color": "#D5EFE0",
-        "banner_bg": "linear-gradient(135deg, #064E3B 0%, #047857 60%, #10B981 100%)",
-        "tag_bg": "rgba(255, 255, 255, 0.25)",
-        "tag_txt": "#D1FAE5",
-        "tittel_farge": "#FFFFFF",
-        "sub_farge": "#ECFDF5",
-        "shadow": "0 4px 16px rgba(4, 120, 87, 0.25)",
-        "border": "none"
-    },
-    "🌸 Søt Lavendel & Blomst": {
-        "bg_color": "#FADCF4",
-        "banner_bg": "linear-gradient(135deg, #701A75 0%, #A21CAF 55%, #E879F9 100%)",
-        "tag_bg": "rgba(255, 255, 255, 0.25)",
-        "tag_txt": "#FDF4FF",
-        "tittel_farge": "#FFFFFF",
-        "sub_farge": "#FCE7F3",
-        "shadow": "0 4px 16px rgba(162, 28, 175, 0.25)",
-        "border": "none"
-    },
-    "☕ Kaffe & Lun Kos": {
-        "bg_color": "#EFE3D5",
-        "banner_bg": "linear-gradient(135deg, #451A03 0%, #78350F 55%, #B45309 100%)",
-        "tag_bg": "rgba(255, 255, 255, 0.22)",
-        "tag_txt": "#FEF3C7",
-        "tittel_farge": "#FFFFFF",
-        "sub_farge": "#FFFBEB",
-        "shadow": "0 4px 16px rgba(120, 53, 15, 0.25)",
-        "border": "none"
-    }
-}
-
 st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
 
+# Skjul menyer og verktøylinjer
 skjul_streamlit_elementer = """
 <style>
     #MainMenu {visibility: hidden;}
@@ -187,7 +124,7 @@ skjul_streamlit_elementer = """
 </style>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#1E3A8A">
+<meta name="theme-color" content="#FF6B6B">
 """
 st.markdown(skjul_streamlit_elementer, unsafe_allow_html=True)
 
@@ -262,7 +199,6 @@ def standard_data(valgt_pin="1234"):
     return {
         "pin": str(valgt_pin),
         "sist_nullstilt": idag_str,
-        "tema": "🌅 Varm Solnedgang",
         "uke_oppgaver_lost": 0,
         "medlemmer": ["Far", "Mor", "Barn 1", "Barn 2"],
         "stjerne_brukere": ["Barn 1", "Barn 2"],
@@ -371,7 +307,7 @@ if "aktiv_familie" not in st.session_state:
 if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_familie"]:
     st.markdown(
         """
-        <div style="background-color: #FFFFFF; border-radius: 16px; padding: 26px; text-align: center; border: 2px solid #BFDBFE; box-shadow: 0 4px 12px rgba(0,0,0,0.06); margin-top: 20px;">
+        <div style="background-color: #EFF6FF; border-radius: 16px; padding: 26px; text-align: center; border: 2px solid #BFDBFE; margin-top: 20px;">
             <h1 style="color: #1E3A8A; margin: 0; font-size: 1.9rem; font-weight: 900;">🏡 Familiehub</h1>
             <p style="color: #3B82F6; font-size: 1.05rem; margin-top: 6px; font-weight: 600;">Logg inn i familiens hjem med navn og PIN-kode</p>
         </div>
@@ -443,7 +379,6 @@ if "sparemaal" not in raw_data: raw_data["sparemaal"] = {}
 if "aktiviteter" not in raw_data: raw_data["aktiviteter"] = STANDARD_AKTIVITETER
 if "fryser" not in raw_data: raw_data["fryser"] = []
 if "uke_oppgaver_lost" not in raw_data: raw_data["uke_oppgaver_lost"] = 0
-if "tema" not in raw_data: raw_data["tema"] = "🌅 Varm Solnedgang"
 
 raw_data["handleliste"] = migrer_handleliste(raw_data.get("handleliste", []))
 raw_data["middagsplan"] = migrer_middagsplan(raw_data.get("middagsplan", {}))
@@ -541,130 +476,7 @@ def aapne_pin_dialog():
     if c_avbr.button("Avbryt", use_container_width=True):
         st.rerun()
 
-# ----------------- HENT TEMA & SETT BAKGRUNN MED SKARP KONTRAST -----------------
-valgt_tema = data.get("tema", "🌅 Varm Solnedgang")
-if valgt_tema not in TEMAER:
-    valgt_tema = "🌅 Varm Solnedgang"
-
-t_stil = TEMAER[valgt_tema]
-
-st.markdown(
-    f"""
-    <style>
-        /* 1. Helsidens bakgrunn */
-        .stApp, [data-testid="stAppViewContainer"], .main {{
-            background-color: {t_stil['bg_color']} !important;
-        }}
-        
-        /* 2. Expander-bokser og innholdskort */
-        div[data-testid="stExpander"] {{
-            background-color: #FFFFFF !important;
-            border-radius: 12px !important;
-            border: 1.5px solid rgba(15, 23, 42, 0.12) !important;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
-            margin-bottom: 10px !important;
-        }}
-        div[data-testid="stExpander"] summary,
-        div[data-testid="stExpander"] summary *,
-        div[data-testid="stExpander"] details summary span,
-        div[data-testid="stExpander"] details summary p {{
-            color: #0F172A !important;
-            font-size: 1.05rem !important;
-            font-weight: 800 !important;
-        }}
-        div[data-testid="stExpander"] summary svg {{
-            fill: #0F172A !important;
-            stroke: #0F172A !important;
-        }}
-
-        /* 3. Faner */
-        .stTabs [data-baseweb="tab-list"] {{
-            background-color: rgba(255, 255, 255, 0.9) !important;
-            border-radius: 12px !important;
-            padding: 6px !important;
-            border: 1px solid rgba(15, 23, 42, 0.12) !important;
-            gap: 4px !important;
-        }}
-        .stTabs [data-baseweb="tab"],
-        .stTabs [data-baseweb="tab"] * {{
-            color: #334155 !important;
-            font-weight: 700 !important;
-            font-size: 0.95rem !important;
-        }}
-        .stTabs [aria-selected="true"] {{
-            background-color: #FFFFFF !important;
-            border-radius: 8px !important;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important;
-        }}
-        .stTabs [aria-selected="true"] * {{
-            color: #0F172A !important;
-            font-weight: 900 !important;
-        }}
-
-        /* 4. Knapper */
-        div.stButton > button, [data-testid="baseButton-secondary"], div.stFormSubmitButton > button {{
-            background-color: #FFFFFF !important;
-            border: 1.5px solid #94A3B8 !important;
-            border-radius: 10px !important;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
-        }}
-        div.stButton > button *, [data-testid="baseButton-secondary"] *, div.stFormSubmitButton > button * {{
-            color: #0F172A !important;
-            font-weight: 700 !important;
-        }}
-        div.stButton > button:hover, div.stFormSubmitButton > button:hover {{
-            background-color: #F1F5F9 !important;
-            border-color: #334155 !important;
-        }}
-
-        /* Primærknapper */
-        div.stButton > button[kind="primary"], [data-testid="baseButton-primary"] {{
-            background-color: #2563EB !important;
-            border: none !important;
-        }}
-        div.stButton > button[kind="primary"] *, [data-testid="baseButton-primary"] * {{
-            color: #FFFFFF !important;
-            font-weight: 700 !important;
-        }}
-
-        /* 5. Skrivefelter, tekstboks og tallboks */
-        div[data-baseweb="input"] > div, input, textarea {{
-            background-color: #FFFFFF !important;
-            color: #0F172A !important;
-            -webkit-text-fill-color: #0F172A !important;
-            font-weight: 600 !important;
-        }}
-        input::placeholder, textarea::placeholder {{
-            color: #64748B !important;
-            -webkit-text-fill-color: #64748B !important;
-            opacity: 1 !important;
-        }}
-
-        /* 6. Checkboxer og radioknapper */
-        label[data-baseweb="checkbox"] *,
-        label[data-baseweb="radio"] *,
-        div[data-testid="stCheckbox"] label *,
-        div[data-testid="stRadio"] label * {{
-            color: #0F172A !important;
-            font-weight: 600 !important;
-        }}
-
-        /* 7. Undertekst og bildetekst (st.caption) */
-        [data-testid="stCaptionContainer"] p, small, .stCaption {{
-            color: #334155 !important;
-            font-weight: 600 !important;
-        }}
-
-        /* 8. All standardtekst */
-        h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {{
-            color: #0F172A !important;
-        }}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# ----------------- TOPPSTRIPE MED FORELDREKNAPP PÅ SKJERMEN -----------------
+# ----------------- TOPPSTRIPE (VARM SOLNEDGANG) -----------------
 naa = datetime.now(TIDSSONE_NORGE)
 dag_indeks = naa.weekday()
 idag_navn = DAGER[dag_indeks]
@@ -676,7 +488,7 @@ col_banner, col_parent_btn = st.columns([0.76, 0.24])
 with col_parent_btn:
     st.write("")
     if st.session_state["foreldremodus"]:
-        if st.button("🔓 Lås foreldre", use_container_width=True, help="Slå av foreldremodus og gå tilbake til barnemodus"):
+        if st.button("🔓 Lås foreldre", use_container_width=True, help="Slå av foreldremodus"):
             st.session_state["foreldremodus"] = False
             st.toast("Barnemodus aktivert!")
             st.rerun()
@@ -686,18 +498,18 @@ with col_parent_btn:
 
 with col_banner:
     banner_html = f"""
-    <div style="background: {t_stil['banner_bg']}; 
+    <div style="background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #FFA8A8 100%); 
                 border-radius: 16px; padding: 12px 14px; text-align: left; margin-bottom: 6px; 
-                box-shadow: {t_stil['shadow']}; border: {t_stil['border']};">
-        <div style="display: inline-block; background: {t_stil['tag_bg']}; 
+                box-shadow: 0 4px 15px rgba(255, 107, 107, 0.25);">
+        <div style="display: inline-block; background: rgba(255, 255, 255, 0.28); 
                     padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 800; 
-                    color: {t_stil['tag_txt']}; text-transform: uppercase; margin-bottom: 4px;">
+                    color: #FFFFFF; text-transform: uppercase; margin-bottom: 4px;">
             ✨ Familiens Hjem
         </div>
-        <h3 style="margin: 0; color: {t_stil['tittel_farge']}; font-size: 1.4rem; font-weight: 900;">
+        <h3 style="margin: 0; color: #FFFFFF; font-size: 1.4rem; font-weight: 900; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.15);">
             🏡 Familiehub <span style="font-weight: 400; opacity: 0.95;">({aktiv_kode.capitalize()})</span>
         </h3>
-        <div style="font-size: 0.85rem; font-weight: 600; color: {t_stil['sub_farge']}; margin-top: 2px;">
+        <div style="font-size: 0.85rem; font-weight: 600; color: #FFF3E0; margin-top: 2px;">
             📅 {dato_tekst} &nbsp;•&nbsp; ⏰ {klokke_tekst}
         </div>
     </div>
@@ -1250,7 +1062,7 @@ with fane_middag:
                 ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
                 nytt_opp_bilde = st.file_uploader("Bilde av retten (valgfritt):", type=["png", "jpg", "jpeg"])
                 
-                if st.form_submit_button("Lagre oppgave", use_container_width=True) and ny_r.strip():
+                if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
@@ -1393,26 +1205,6 @@ with fane_aktiviteter:
 if er_forelder and fane_familie:
     with fane_familie:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
-        
-        with st.expander("🎨 **Utseende & Tema for Appen**", expanded=True):
-            st.caption("Velg familiens favoritt-tema (endrer både bakgrunnsfargen og toppbanneret):")
-            tema_alternativer = list(TEMAER.keys())
-            naavaerende_tema = data.get("tema", "🌅 Varm Solnedgang")
-            if naavaerende_tema not in tema_alternativer:
-                naavaerende_tema = "🌅 Varm Solnedgang"
-                
-            valgt_nytt_tema = st.radio(
-                "Velg stil:", 
-                tema_alternativer, 
-                index=tema_alternativer.index(naavaerende_tema)
-            )
-            if valgt_nytt_tema != data.get("tema"):
-                data["tema"] = valgt_nytt_tema
-                lagre_naa()
-                st.toast(f"Tema oppdatert til {valgt_nytt_tema}! 🎉")
-                st.rerun()
-
-        st.divider()
 
         with st.expander("🏷️ **Endre navnet på Familiehuben**", expanded=False):
             with st.form("form_endre_fam_navn"):
@@ -1541,3 +1333,4 @@ with c_b2:
         st.session_state["foreldremodus"] = False
         st.query_params.clear()
         st.rerun()
+    
