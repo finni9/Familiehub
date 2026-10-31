@@ -109,7 +109,6 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
-# ----------------- TEMA-ORDLISTE MED 6 TEMAER (FORSTERKET KONTRAST) -----------------
 TEMAER = {
     "🌅 Varm Solnedgang": {
         "bg_color": "#FFE9DE",
@@ -548,7 +547,6 @@ if valgt_tema not in TEMAER:
 
 t_stil = TEMAER[valgt_tema]
 
-# Injiser CSS som overstyrer bakgrunn og sikrer krystallklar tekst
 st.markdown(
     f"""
     <style>
@@ -566,15 +564,52 @@ st.markdown(
             margin-bottom: 8px !important;
         }}
 
-        /* Sørger for at fanene skiller seg ut */
-        .stTabs [data-baseweb="tab-list"] {{
-            background-color: rgba(255, 255, 255, 0.6) !important;
+        /* Sikrer at vanlige knapper har hvit bakgrunn, mørk tekst og tydelig kant */
+        div.stButton > button, [data-testid="baseButton-secondary"], div.stFormSubmitButton > button {{
+            background-color: #FFFFFF !important;
+            border: 1.5px solid #94A3B8 !important;
             border-radius: 10px !important;
-            padding: 4px !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
         }}
 
-        /* Sikrer at all brødtekst er dyp mørk og lettlest */
-        .stMarkdown, p, span, label {{
+        /* Tvinger teksten inni knapper til å være mørk koksgrå og fet */
+        div.stButton > button *, [data-testid="baseButton-secondary"] *, div.stFormSubmitButton > button * {{
+            color: #0F172A !important;
+            font-weight: 700 !important;
+        }}
+
+        /* Hover-effekt på vanlige knapper */
+        div.stButton > button:hover, div.stFormSubmitButton > button:hover {{
+            background-color: #F1F5F9 !important;
+            border-color: #475569 !important;
+        }}
+
+        /* Primærknapper får solid blå bakgrunn og hvit skrift */
+        div.stButton > button[kind="primary"], [data-testid="baseButton-primary"] {{
+            background-color: #2563EB !important;
+            border: none !important;
+        }}
+        div.stButton > button[kind="primary"] *, [data-testid="baseButton-primary"] * {{
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+        }}
+
+        /* Fanelinjen */
+        .stTabs [data-baseweb="tab-list"] {{
+            background-color: rgba(255, 255, 255, 0.75) !important;
+            border-radius: 10px !important;
+            padding: 4px !important;
+            border: 1px solid rgba(0,0,0,0.06) !important;
+        }}
+
+        /* Faneknapper */
+        .stTabs [data-baseweb="tab"] {{
+            color: #334155 !important;
+            font-weight: 600 !important;
+        }}
+
+        /* All vanlig tekst på siden */
+        .stMarkdown p, .stMarkdown span, label {{
             color: #0F172A !important;
         }}
     </style>
@@ -1312,7 +1347,6 @@ if er_forelder and fane_familie:
     with fane_familie:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
         
-        # 🎨 Velg tema med forsterkede bakgrunner
         with st.expander("🎨 **Utseende & Tema for Appen**", expanded=True):
             st.caption("Velg familiens favoritt-tema (endrer både bakgrunnsfargen og toppbanneret):")
             tema_alternativer = list(TEMAER.keys())
