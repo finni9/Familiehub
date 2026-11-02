@@ -225,6 +225,17 @@ def migrer_oppgaver(oppg_liste):
         nye.append(o)
     return nye
 
+def migrer_fryser(gammel_liste):
+    ny_liste = []
+    for item in gammel_liste:
+        if isinstance(item, dict):
+            if "plassering" not in item:
+                item["plassering"] = "fryser"
+            ny_liste.append(item)
+        elif isinstance(item, str):
+            ny_liste.append({"id": str(uuid.uuid4()), "navn": item, "plassering": "fryser"})
+    return ny_liste
+
 def standard_data(valgt_pin="1234"):
     idag_str = datetime.now(TIDSSONE_NORGE).strftime("%Y-%m-%d")
     return {
@@ -238,8 +249,10 @@ def standard_data(valgt_pin="1234"):
         "aktiviteter": STANDARD_AKTIVITETER,
         "stjerne_logg": [],
         "fryser": [
-            {"id": str(uuid.uuid4()), "navn": "Laksefilet (4 pk)"},
-            {"id": str(uuid.uuid4()), "navn": "Hjemmelaget Bolognese"}
+            {"id": str(uuid.uuid4()), "navn": "Laksefilet (4 pk)", "plassering": "fryser"},
+            {"id": str(uuid.uuid4()), "navn": "Kjøttdeig 400g", "plassering": "fryser"},
+            {"id": str(uuid.uuid4()), "navn": "Pastasaus på glass", "plassering": "matskap"},
+            {"id": str(uuid.uuid4()), "navn": "Hakkede tomater 2 bokser", "plassering": "matskap"}
         ],
         "beskjeder": [
             {"id": str(uuid.uuid4()), "tekst": "Velkommen til Familiehuben! 🌟", "fra": "Familien", "tid": "Kl. 08:00"}
@@ -422,10 +435,10 @@ else: raw_data["oppskrifter"] = migrer_oppskrifter(raw_data["oppskrifter"])
 if "basisvarer" not in raw_data: raw_data["basisvarer"] = STANDARD_BASISVARER
 if "sparemaal" not in raw_data: raw_data["sparemaal"] = {}
 if "aktiviteter" not in raw_data: raw_data["aktiviteter"] = STANDARD_AKTIVITETER
-if "fryser" not in raw_data: raw_data["fryser"] = []
 if "uke_oppgaver_lost" not in raw_data: raw_data["uke_oppgaver_lost"] = 0
 if "stjerne_logg" not in raw_data: raw_data["stjerne_logg"] = []
 
+raw_data["fryser"] = migrer_fryser(raw_data.get("fryser", []))
 raw_data["oppgaver"] = migrer_oppgaver(raw_data.get("oppgaver", []))
 raw_data["handleliste"] = migrer_handleliste(raw_data.get("handleliste", []))
 raw_data["middagsplan"] = migrer_middagsplan(raw_data.get("middagsplan", {}))
@@ -1274,7 +1287,7 @@ with fane_statistikk:
         trend_tekst = f"⚖️ Familien holder jevnt og stødig tempo likt som i {forrige_mnd_navn}!"
         trend_farge = "#3B82F6"
     else:
-        trend_tekst = f"💪 Dere ligger {abs(diff_tjent)} ⭐ bak fjorårets/forrige måneds nivå ({forrige_mnd_navn}). Klarer dere å ta det igjen?"
+        trend_tekst = f"💪 Dere ligger {abs(diff_tjent)} ⭐ bak forrige måneds nivå ({forrige_mnd_navn}). Klarer dere å ta det igjen?"
         trend_farge = "#F59E0B"
 
     st.markdown(
@@ -1348,39 +1361,67 @@ with fane_statistikk:
     else:
         st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE 4: MIDDAG & FRYSER (MED KOMPAKTE RADER & SIKRET 🛒-KNAPP) -----------------
+# ----------------- FANE 4: MIDDAG & FRYSER (OPPDELT & KOMPRIMERT) -----------------
 with fane_middag:
+    # 1. KOMPRIMERT FRYSER OG MATSKAP (SIDE OM SIDE)
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
-        fryser_varer = data.get("fryser", [])
-        slett_f_id = None
+        fryser_data = data.get("fryser", [])
+        varer_fryser = [v for v in fryser_data if v.get("plassering", "fryser") == "fryser"]
+        varer_matskap = [v for v in fryser_data if v.get("plassering") == "matskap"]
         
-        if fryser_varer:
-            for fv in fryser_varer:
-                c_fn, c_fknapp, c_fslett = st.columns([0.55, 0.30, 0.15])
-                c_fn.markdown(f"📦 **{fv['navn']}**")
-                
-                if c_fknapp.button("Til middagsplan", key=f"fryser_bruk_{fv['id']}"):
-                    data["middagsplan"][idag_navn] = fv["navn"]
-                    st.session_state[f"rett_{idag_navn}"] = fv["navn"]
-                    lagre_naa()
-                    st.toast(f"Satt {fv['navn']} som middag i dag! 🍽️")
-                    st.rerun()
+        slett_f_id = None
+        col_fryser, col_matskap = st.columns(2)
 
-                if c_fslett.button("✕", key=f"fryser_del_{fv['id']}"):
-                    slett_f_id = fv["id"]
+        # Venstre kolonne: Fryser
+        with col_fryser:
+            st.markdown("##### 🧊 Fryser")
+            if varer_fryser:
+                for fv in varer_fryser:
+                    c_txt, c_btn, c_del = st.columns([0.64, 0.20, 0.16])
+                    c_txt.markdown(f"<div style='padding-top: 5px; font-size: 0.88rem; font-weight: 700; color: #FFFFFF;'>📦 {fv['navn']}</div>", unsafe_allow_html=True)
+                    if c_btn.button("🍽️", key=f"f_sett_{fv['id']}", help=f"Sett {fv['navn']} som middag i dag"):
+                        data["middagsplan"][idag_navn] = fv["navn"]
+                        st.session_state[f"rett_{idag_navn}"] = fv["navn"]
+                        lagre_naa()
+                        st.toast(f"Satt {fv['navn']} på menyen i dag!")
+                        st.rerun()
+                    if c_del.button("✕", key=f"f_slett_{fv['id']}", help="Slett"):
+                        slett_f_id = fv["id"]
+            else:
+                st.caption("Tomt i fryseren.")
 
-            if slett_f_id:
-                data["fryser"] = [x for x in data["fryser"] if x["id"] != slett_f_id]
-                lagre_naa()
-                st.rerun()
-        else:
-            st.caption("Ingen varer registrert i fryseren.")
+        # Høyre kolonne: Matskap
+        with col_matskap:
+            st.markdown("##### 🥫 Matskap / Tørrvare")
+            if varer_matskap:
+                for mv in varer_matskap:
+                    c_txt, c_btn, c_del = st.columns([0.64, 0.20, 0.16])
+                    c_txt.markdown(f"<div style='padding-top: 5px; font-size: 0.88rem; font-weight: 700; color: #FFFFFF;'>🥫 {mv['navn']}</div>", unsafe_allow_html=True)
+                    if c_btn.button("🍽️", key=f"m_sett_{mv['id']}", help=f"Sett {mv['navn']} som middag i dag"):
+                        data["middagsplan"][idag_navn] = mv["navn"]
+                        st.session_state[f"rett_{idag_navn}"] = mv["navn"]
+                        lagre_naa()
+                        st.toast(f"Satt {mv['navn']} på menyen i dag!")
+                        st.rerun()
+                    if c_del.button("✕", key=f"m_slett_{mv['id']}", help="Slett"):
+                        slett_f_id = mv["id"]
+            else:
+                st.caption("Tomt i matskapet.")
+
+        if slett_f_id:
+            data["fryser"] = [x for x in data["fryser"] if x["id"] != slett_f_id]
+            lagre_naa()
+            st.rerun()
 
         st.write("---")
-        with st.form("form_ny_fryser_vare", clear_on_submit=True):
-            ny_f_tekst = st.text_input("Vare i fryser/matskap:", placeholder="f.eks. Kjøttkaker 2 pk, Laks 500g")
-            if st.form_submit_button("Legg i fryseren 🧊", use_container_width=True) and ny_f_tekst.strip():
-                data["fryser"].append({"id": str(uuid.uuid4()), "navn": ny_f_tekst.strip()})
+        with st.form("form_ny_lagret_vare", clear_on_submit=True):
+            col_in_navn, col_in_plass, col_in_btn = st.columns([0.55, 0.28, 0.17])
+            ny_f_tekst = col_in_navn.text_input("Ny vare:", placeholder="f.eks. Kjøttkaker 2 pk, Laks", label_visibility="collapsed")
+            ny_f_sted = col_in_plass.selectbox("Hvor?", ["🧊 Fryser", "🥫 Matskap"], label_visibility="collapsed")
+            
+            if col_in_btn.form_submit_button("Legg til ➕", use_container_width=True) and ny_f_tekst.strip():
+                sted_kode = "fryser" if "Fryser" in ny_f_sted else "matskap"
+                data["fryser"].append({"id": str(uuid.uuid4()), "navn": ny_f_tekst.strip(), "plassering": sted_kode})
                 lagre_naa()
                 st.rerun()
 
@@ -1406,7 +1447,7 @@ with fane_middag:
 
     st.write("---")
     
-    # KOMPAKT RUTENETT FOR DAGENE (2 OG 2 SAMMEN, SAMT LITE HODE MED SPIST-KNAPP)
+    # 2. KOMPAKT RUTENETT FOR UKEMENYEN (2 OG 2 SAMMEN)
     st.markdown("#### 📅 Ukens Middagsplan")
     
     dag_rader = [
@@ -1426,23 +1467,21 @@ with fane_middag:
                 valgt_rett = st.session_state.get(f"rett_{dag}", "")
                 badge_idag = " <span style='background-color: #3B82F6; color: #FFFFFF; font-size: 0.68rem; padding: 1px 5px; border-radius: 5px; font-weight: 800;'>I DAG</span>" if er_idag else ""
 
-                # TOPPLINJE PÅ KORTET: Dagnavn til venstre, "🍽️ Spist"-knapp kompakt til høyre hvis det er i dag
                 if er_idag and valgt_rett.strip():
                     c_dag_navn, c_spist = st.columns([0.62, 0.38])
                     with c_dag_navn:
                         st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
                     with c_spist:
-                        if st.button("🍽️ Spist", key=f"spist_btn_{dag}", help="Marker som spist og stryk fra fryseren hvis råvaren fantes", use_container_width=True):
+                        if st.button("🍽️ Spist", key=f"spist_btn_{dag}", help="Marker som spist og stryk fra fryser/matskap", use_container_width=True):
                             slettet, slettet_navn = slett_vare_fra_fryser_ved_navn(valgt_rett)
                             if slettet:
                                 st.balloons()
-                                st.toast(f"🎉 '{slettet_navn}' er nå strøket fra fryseren!")
+                                st.toast(f"🎉 '{slettet_navn}' er nå strøket fra fryser/matskap!")
                             else:
                                 st.toast(f"Middagen for {dag} er spist! 🍽️")
                 else:
                     st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 2px;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
 
-                # INNDATAFELT OG HANDLEVOGN-KNAPP PÅ SAMME LINJE (KNAPPEN VISES ALLTID)
                 c_inn, c_kjop = st.columns([0.80, 0.20])
                 ny_rett = c_inn.text_input(
                     f"Rett {dag}", 
@@ -1472,35 +1511,62 @@ with fane_middag:
     if plan_oppdatert: 
         lagre_naa()
 
+    st.write("---")
+
+    # 3. KOMPRIMERT BILDEKOKEBOK (2 KOLONNER I BREDDEN MED FAST BILDEHØYDE)
     with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
-        for tittel, info in sorted(oppskrifter.items()):
-            ingr_liste = info.get("ingredienser", [])
-            bilde_url = info.get("bilde")
+        oppskrift_nokler = sorted(list(oppskrifter.keys()))
+        
+        # Vis oppskrifter 2 og 2 ved siden av hverandre
+        for r_idx in range(0, len(oppskrift_nokler), 2):
+            par = oppskrift_nokler[r_idx:r_idx + 2]
+            cols_par = st.columns(len(par))
             
-            st.markdown(f"### 🍽️ {tittel}")
-            if bilde_url: st.image(bilde_url, use_container_width=True)
-            else: st.info("📷 Ingen bilde lagt til enda.")
+            for c_idx, tittel in enumerate(par):
+                info = oppskrifter[tittel]
+                ingr_liste = info.get("ingredienser", [])
+                bilde_url = info.get("bilde")
 
-            st.caption(f"Ingredienser: {', '.join(ingr_liste)}" if ingr_liste else "Ingen ingredienser lagt inn")
-            
-            c_d, c_s = st.columns([0.55, 0.45])
-            valgt_dag = c_d.selectbox(f"Dag for {tittel}", DAGER, key=f"v_dag_{tittel}", label_visibility="collapsed")
-            c_s.button("Sett på meny 📅", key=f"s_meny_{tittel}", on_click=cb_sett_middag, args=(valgt_dag, tittel), use_container_width=True)
-            
-            with st.expander(f"📸 Endre / Legg til bilde for {tittel}"):
-                nytt_bilde_fil = st.file_uploader(f"Last opp eller knips bilde av {tittel}:", type=["png", "jpg", "jpeg"], key=f"file_{tittel}")
-                if st.button("Lagre bilde 💾", key=f"btn_bilde_{tittel}") and nytt_bilde_fil:
-                    b64 = bilde_til_base64(nytt_bilde_fil)
-                    if b64:
-                        oppskrifter[tittel]["bilde"] = b64
-                        if lagre_naa():
-                            st.toast(f"Bilde lagret for {tittel}!")
-                            st.rerun()
+                with cols_par[c_idx]:
+                    st.markdown(
+                        f"""
+                        <div style="background-color: #1E293B; border: 1px solid #334155; border-radius: 10px; padding: 10px; margin-bottom: 8px;">
+                            <div style="font-weight: 800; font-size: 1.05rem; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{tittel}">
+                                🍽️ {tittel}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                    
+                    if bilde_url:
+                        st.image(bilde_url, use_container_width=True)
+                    else:
+                        st.caption("📷 Ingen bilde enda")
 
-            if er_forelder and st.button("Slett oppskrift ✕", key=f"del_op_{tittel}"):
-                slett_oppskrift = tittel
-            st.divider()
+                    ingr_kort = ", ".join(ingr_liste[:4])
+                    if len(ingr_liste) > 4:
+                        ingr_kort += f" (+{len(ingr_liste)-4} til)"
+                    st.caption(f"Ingredienser: {ingr_kort}" if ingr_liste else "Ingen ingredienser")
+
+                    c_dag_sel, c_sett_knapp = st.columns([0.55, 0.45])
+                    valgt_dag = c_dag_sel.selectbox(f"Dag for {tittel}", DAGER, key=f"v_dag_{tittel}", label_visibility="collapsed")
+                    c_sett_knapp.button("Sett på 📅", key=f"s_meny_{tittel}", on_click=cb_sett_middag, args=(valgt_dag, tittel), use_container_width=True)
+
+                    with st.expander(f"⚙️ Mer / Bilde"):
+                        nytt_bilde_fil = st.file_uploader(f"Bilde:", type=["png", "jpg", "jpeg"], key=f"file_{tittel}")
+                        if st.button("Lagre bilde 💾", key=f"btn_bilde_{tittel}") and nytt_bilde_fil:
+                            b64 = bilde_til_base64(nytt_bilde_fil)
+                            if b64:
+                                oppskrifter[tittel]["bilde"] = b64
+                                if lagre_naa():
+                                    st.toast(f"Bilde lagret for {tittel}!")
+                                    st.rerun()
+
+                        if er_forelder and st.button("Slett rett ✕", key=f"del_op_{tittel}", use_container_width=True):
+                            slett_oppskrift = tittel
+            st.write("")
 
         if slett_oppskrift:
             del data["oppskrifter"][slett_oppskrift]
@@ -1508,13 +1574,15 @@ with fane_middag:
             st.rerun()
 
         if er_forelder:
+            st.write("---")
             with st.form("form_ny_oppskrift", clear_on_submit=True):
                 st.markdown("##### ➕ Legg til en ny rett")
-                ny_r = st.text_input("Navn på retten:")
+                col_nr1, col_nr2 = st.columns([0.6, 0.4])
+                ny_r = col_nr1.text_input("Navn på retten:")
+                nytt_opp_bilde = col_nr2.file_uploader("Bilde (valgfritt):", type=["png", "jpg", "jpeg"])
                 ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
-                nytt_opp_bilde = st.file_uploader("Bilde av retten (valgfritt):", type=["png", "jpg", "jpeg"])
                 
-                if st.form_submit_button("Lagre oppgave", use_container_width=True) and ny_r.strip():
+                if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
@@ -1621,7 +1689,7 @@ with fane_aktiviteter:
     if "trukket_aktivitet" in st.session_state:
         st.markdown(
             f"""
-            <div style="background-color: #064E3B; border: 2px solid #10B981; border-radius: 12px; padding: 18px; text-align: center; margin-14px 0;">
+            <div style="background-color: #064E3B; border: 2px solid #10B981; border-radius: 12px; padding: 18px; text-align: center; margin: 14px 0;">
                 <div style="font-size: 1.1rem; color: #A7F3D0; font-weight: 800;">Dagens utvalgte aktivitet:</div>
                 <div style="font-size: 1.45rem; font-weight: 900; color: #FFFFFF; margin-top: 6px;">
                     {st.session_state['trukket_aktivitet']}
