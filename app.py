@@ -613,7 +613,7 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
             unsafe_allow_html=True
         )
 
-    # Generer kalenderuker (0 = Mandag)
+   # Generer kalenderuker (0 = Mandag)
     cal = calendar.Calendar(firstweekday=0)
     uker = cal.monthdayscalendar(vis_aar, vis_mnd)
 
@@ -622,8 +622,8 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
         for dag_idx, dag_nr in enumerate(uke):
             with kolonner_uke[dag_idx]:
                 if dag_nr == 0:
-                    # Dag utenfor denne måneden
-                    st.markdown("<div style='min-height: 52px; background: rgba(0,0,0,0.02); border-radius: 6px; margin-bottom: 4px;'></div>", unsafe_allow_html=True)
+                    # Tom rute for dager utenfor måneden
+                    st.markdown("<div style='min-height: 60px; background: rgba(0,0,0,0.02); border-radius: 6px; margin-bottom: 4px;'></div>", unsafe_allow_html=True)
                 else:
                     curr_date = date(vis_aar, vis_mnd, dag_nr)
                     curr_date_str = curr_date.strftime("%Y-%m-%d")
@@ -632,9 +632,14 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
                     # Finn hendelser på denne datoen
                     dagens_hendelser = [m for m in merkedager if m["dato"] == curr_date_str]
                     
-                    kant_farge = "#2563EB" if er_idag else "#E2E8F0"
+                    kant_farge = "#2563EB" if er_idag else "#CBD5E1"
                     bg_dag = "#EFF6FF" if er_idag else "#FFFFFF"
-                    dag_label = f"<b>{dag_nr}</b>" if not er_idag else f"<b style='color: #2563EB;'>{dag_nr}</b>"
+                    
+                    # TYDELIG DATO-NUMMER MED FAST MØRK FARGE:
+                    if er_idag:
+                        dag_badge = f"<span style='background-color: #2563EB; color: #FFFFFF; padding: 2px 6px; border-radius: 10px; font-weight: 900; font-size: 0.85rem;'>{dag_nr}</span>"
+                    else:
+                        dag_badge = f"<span style='color: #0F172A; font-weight: 800; font-size: 0.9rem;'>{dag_nr}</span>"
 
                     hendelser_html = ""
                     for h in dagens_hendelser:
@@ -644,8 +649,8 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
                         h_tittel = h["tittel"]
                         hendelser_html += f"""
                         <div style="background-color: {prof['bg']}; border-left: 3px solid {prof['kant']}; 
-                                    padding: 2px 4px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; 
-                                    color: #0F172A; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" 
+                                    padding: 2px 4px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; 
+                                    color: #0F172A !important; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" 
                              title="{h_tittel} ({h_hvem})">
                             {prof['ikon']} {h_ikon} {h_tittel}
                         </div>
@@ -653,9 +658,11 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
 
                     st.markdown(
                         f"""
-                        <div style="min-height: 56px; background-color: {bg_dag}; border: 1.5px solid {kant_farge}; 
-                                    border-radius: 6px; padding: 3px 4px; margin-bottom: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
-                            <div style="font-size: 0.75rem; text-align: right; line-height: 1;">{dag_label}</div>
+                        <div style="min-height: 62px; background-color: {bg_dag}; border: 1.5px solid {kant_farge}; 
+                                    border-radius: 8px; padding: 4px; margin-bottom: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <div style="text-align: right; line-height: 1.1; margin-bottom: 2px;">
+                                {dag_badge}
+                            </div>
                             {hendelser_html}
                         </div>
                         """,
