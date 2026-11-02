@@ -4,8 +4,9 @@ import random
 import uuid
 import base64
 import io
+import time
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 from PIL import Image
 from streamlit_gsheets import GSheetsConnection
@@ -109,9 +110,26 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
+# ----------------- FARGE- OG IKONPROFILER PER FAMILIEMEDLEM -----------------
+PERSON_PROFILER = [
+    {"navn_farge": "#1D4ED8", "bg": "#EFF6FF", "kant": "#3B82F6", "badge": "#DBEAFE", "ikon": "🦁"},  # Blå Løve
+    {"navn_farge": "#BE185D", "bg": "#FDF2F8", "kant": "#EC4899", "badge": "#FCE7F3", "ikon": "🐰"},  # Rosa Kanin
+    {"navn_farge": "#B45309", "bg": "#FEF3C7", "kant": "#F59E0B", "badge": "#FDE68A", "ikon": "🐻"},  # Gul/Brun Bjørn
+    {"navn_farge": "#047857", "bg": "#ECFDF5", "kant": "#10B981", "badge": "#D1FAE5", "ikon": "🦊"},  # Grønn Rev
+    {"navn_farge": "#6D28D9", "bg": "#F5F3FF", "kant": "#8B5CF6", "badge": "#EDE9FE", "ikon": "🐼"},  # Lilla Panda
+    {"navn_farge": "#C2410C", "bg": "#FFF7ED", "kant": "#F97316", "badge": "#FFEDD5", "ikon": "🐯"},  # Oransje Tiger
+]
+
+def hent_profil(person, alle_medlemmer):
+    if person == FELLES_VALG or person == "Felles":
+        return {"navn_farge": "#334155", "bg": "#F8FAFC", "kant": "#64748B", "badge": "#E2E8F0", "ikon": "🤝"}
+    if person in alle_medlemmer:
+        idx = alle_medlemmer.index(person) % len(PERSON_PROFILER)
+        return PERSON_PROFILER[idx]
+    return PERSON_PROFILER[0]
+
 st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
 
-# Skjul menyer og verktøylinjer
 skjul_streamlit_elementer = """
 <style>
     #MainMenu {visibility: hidden;}
@@ -194,6 +212,18 @@ def migrer_middagsplan(gammel_plan):
             ny_plan[dag] = ""
     return ny_plan
 
+def migrer_oppgaver(oppg_liste):
+    nye = []
+    for o in oppg_liste:
+        if "id" not in o: o["id"] = str(uuid.uuid4())
+        if "ikon" not in o: o["ikon"] = "✨"
+        if "status" not in o:
+            o["status"] = "godkjent" if o.get("ferdig", False) else "ugjort"
+        if "gjentakende" not in o: o["gjentakende"] = True
+        if "stjerner" not in o: o["stjerner"] = 1
+        nye.append(o)
+    return nye
+
 def standard_data(valgt_pin="1234"):
     idag_str = datetime.now(TIDSSONE_NORGE).strftime("%Y-%m-%d")
     return {
@@ -219,9 +249,11 @@ def standard_data(valgt_pin="1234"):
             {"id": str(uuid.uuid4()), "tittel": "Bestemme lørdagsfilm", "pris": 10}
         ],
         "oppgaver": [
-            {"id": str(uuid.uuid4()), "tekst": "Pusse tenner morgen & kveld", "hvem": "Barn 1", "ferdig": False, "stjerner": 1, "fullfort_av": None, "gjentakende": True},
-            {"id": str(uuid.uuid4()), "tekst": "Pusse tenner morgen & kveld", "hvem": "Barn 2", "ferdig": False, "stjerner": 1, "fullfort_av": None, "gjentakende": True},
-            {"id": str(uuid.uuid4()), "tekst": "Rydde av bordet etter middag", "hvem": FELLES_VALG, "ferdig": False, "stjerner": 2, "fullfort_av": None, "gjentakende": True},
+            {"id": str(uuid.uuid4()), "ikon": "🪥", "tekst": "Pusse tenner morgen & kveld", "hvem": "Barn 1", "status": "ugjort", "stjerner": 1, "fullfort_av": None, "gjentakende": True},
+            {"id": str(uuid.uuid4()), "ikon": "🪥", "tekst": "Pusse tenner morgen & kveld", "hvem": "Barn 2", "status": "ugjort", "stjerner": 1, "fullfort_av": None, "gjentakende": True},
+            {"id": str(uuid.uuid4()), "ikon": "🛏️", "tekst": "Re opp sengen", "hvem": "Barn 1", "status": "ugjort", "stjerner": 1, "fullfort_av": None, "gjentakende": True},
+            {"id": str(uuid.uuid4()), "ikon": "🛏️", "tekst": "Re opp sengen", "hvem": "Barn 2", "status": "ugjort", "stjerner": 1, "fullfort_av": None, "gjentakende": True},
+            {"id": str(uuid.uuid4()), "ikon": "🍽️", "tekst": "Rydde av bordet etter middag", "hvem": FELLES_VALG, "status": "ugjort", "stjerner": 2, "fullfort_av": None, "gjentakende": True},
         ],
         "oppskrifter": STANDARD_MIDDAGER,
         "middagsplan": {dag: "" for dag in DAGER},
@@ -229,14 +261,11 @@ def standard_data(valgt_pin="1234"):
         "handleliste": migrer_handleliste(["Melk", "Brød", "Smør"])
     }
 
-# ----------------- MULTI-FAMILIE GOOGLE SHEETS -----------------
-import time
-
 # ----------------- STABIL MULTI-FAMILIE GOOGLE SHEETS -----------------
 def hent_hele_tabellen():
     for forsok in range(3):
         try:
-            df = conn.read(ttl=2)  # 2 sekunders cache sparer unødige API-kall
+            df = conn.read(ttl=2)
             if df is None or df.empty:
                 return pd.DataFrame(columns=["familie_kode", "data_dump"])
             if "familie_kode" not in df.columns:
@@ -244,15 +273,13 @@ def hent_hele_tabellen():
                 if "data_dump" not in df.columns:
                     df["data_dump"] = "{}"
             return df[["familie_kode", "data_dump"]].dropna(subset=["familie_kode"])
-        except Exception as e:
+        except Exception:
             if forsok < 2:
                 time.sleep(0.5 * (forsok + 1))
             else:
-                st.warning("⚠️ Litt treg kontakt med skylagringen, prøver igjen...")
                 return pd.DataFrame(columns=["familie_kode", "data_dump"])
 
 def hent_familie_json(familie_navn):
-    # Hvis vi allerede har ferske data i minnet for denne økten, bruk dem
     if "familie_data" in st.session_state and st.session_state.get("aktiv_familie") == str(familie_navn).lower():
         return st.session_state["familie_data"]
 
@@ -268,17 +295,15 @@ def hent_familie_json(familie_navn):
     return None
 
 def lagre_familie_data(familie_navn, ny_data):
-    # 1. Oppdater alltid lokal minnetilstand umiddelbart
     st.session_state["familie_data"] = ny_data
     
-    # 2. Prøv å synkronisere til Google Sheets med retry
     for forsok in range(3):
         try:
             df = hent_hele_tabellen()
             json_tekst = json.dumps(ny_data, ensure_ascii=False)
             
             if len(json_tekst) > 48000:
-                st.error("⚠️ Datamengden er for stor for regnearket. Endringen ble ikke lagret.")
+                st.error("⚠️ Datamengden er for stor for regnearket.")
                 return False
             
             mask = df["familie_kode"].astype(str).str.lower() == str(familie_navn).lower()
@@ -290,11 +315,11 @@ def lagre_familie_data(familie_navn, ny_data):
                 
             conn.update(data=df)
             return True
-        except Exception as e:
+        except Exception:
             if forsok < 2:
-                time.sleep(0.6 * (forsok + 1))  # Vent litt før neste forsøk
+                time.sleep(0.6 * (forsok + 1))
             else:
-                st.toast("⚠️ Kunne ikke lagre til skyen akkurat nå. Dataene beholdes lokalt på skjermen!")
+                st.toast("⚠️ Sky-lagring er litt treg. Endringen er beholdt i minnet!")
                 return False
 
 def endre_familie_navn(gammelt_navn, nytt_navn):
@@ -389,7 +414,7 @@ raw_data = hent_familie_json(aktiv_kode)
 
 if not raw_data:
     st.warning("Kobler til familiens skyhub...")
-    st.stop()  # Stopper skriptet midlertidig i stedet for å slette aktiv_familie og kaste deg ut!
+    st.stop()
 
 if "merkedager" not in raw_data: raw_data["merkedager"] = []
 if "oppskrifter" not in raw_data: raw_data["oppskrifter"] = STANDARD_MIDDAGER
@@ -400,6 +425,7 @@ if "aktiviteter" not in raw_data: raw_data["aktiviteter"] = STANDARD_AKTIVITETER
 if "fryser" not in raw_data: raw_data["fryser"] = []
 if "uke_oppgaver_lost" not in raw_data: raw_data["uke_oppgaver_lost"] = 0
 
+raw_data["oppgaver"] = migrer_oppgaver(raw_data.get("oppgaver", []))
 raw_data["handleliste"] = migrer_handleliste(raw_data.get("handleliste", []))
 raw_data["middagsplan"] = migrer_middagsplan(raw_data.get("middagsplan", {}))
 
@@ -415,7 +441,7 @@ idag_str = idag_dato.strftime("%Y-%m-%d")
 if data.get("sist_nullstilt") != idag_str:
     for o in data["oppgaver"]:
         if o.get("gjentakende", False):
-            o["ferdig"] = False
+            o["status"] = "ugjort"
             o["fullfort_av"] = None
     data["merkedager"] = [
         m for m in data.get("merkedager", [])
@@ -463,9 +489,9 @@ def cb_auto_planlegg(oppskriftsliste):
     lagre_naa()
 
 def cb_start_ny_uke():
-    data["oppgaver"] = [o for o in data["oppgaver"] if o.get("gjentakende", False) or not o["ferdig"]]
+    data["oppgaver"] = [o for o in data["oppgaver"] if o.get("gjentakende", False) or o.get("status") != "godkjent"]
     for o in data["oppgaver"]:
-        o["ferdig"] = False
+        o["status"] = "ugjort"
         o["fullfort_av"] = None
     for dag in DAGER:
         data["middagsplan"][dag] = ""
@@ -483,7 +509,7 @@ if "foreldremodus" not in st.session_state:
 # ----------------- MODAL FOR FORELDRE-PIN -----------------
 @st.dialog("🔐 Tast foreldre-PIN")
 def aapne_pin_dialog():
-    st.caption("Skriv inn familiens PIN for å låse opp Admin-funksjonene:")
+    st.caption("Skriv inn familiens PIN for å låse opp Admin og godkjenne oppgaver:")
     pin_input = st.text_input("PIN-kode:", type="password", max_chars=8, key="dlg_pin_input")
     c_ok, c_avbr = st.columns(2)
     if c_ok.button("Lås opp 🔓", use_container_width=True):
@@ -513,7 +539,7 @@ with col_parent_btn:
             st.toast("Barnemodus aktivert!")
             st.rerun()
     else:
-        if st.button("🔐 Foreldre", use_container_width=True, help="Tast PIN for å åpne Admin-fanen"):
+        if st.button("🔐 Foreldre", use_container_width=True, help="Tast PIN for å godkjenne stjerner og åpne Admin"):
             aapne_pin_dialog()
 
 with col_banner:
@@ -539,6 +565,7 @@ with col_banner:
 # ----------------- KALENDER -----------------
 with st.expander("🗓️ **Familiens Kalender & Merkedager**", expanded=False):
     merkedager = data.get("merkedager", [])
+    medlemmer = data.get("medlemmer", ["Far", "Mor", "Barn 1", "Barn 2"])
     slett_merkedag_id = None
     
     if merkedager:
@@ -547,22 +574,23 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager**", expanded=False):
             m_dato = datetime.strptime(m["dato"], "%Y-%m-%d").date()
             dager_igjen = (m_dato - idag_dato).days
             
-            if dager_igjen == 0:
-                nedtelling = "🎉 I DAG!"
-                bg_farge, kant_farge = "#D1FAE5", "#10B981"
-            elif dager_igjen == 1:
-                nedtelling = "⏰ I morgen!"
-                bg_farge, kant_farge = "#FEF3C7", "#F59E0B"
-            else:
-                nedtelling = f"⏳ Om {dager_igjen} dager"
-                bg_farge, kant_farge = "#F0FDF4", "#3B82F6"
+            if dager_igjen == 0: nedtelling = "🎉 I DAG!"
+            elif dager_igjen == 1: nedtelling = "⏰ I morgen!"
+            else: nedtelling = f"⏳ Om {dager_igjen} dager"
+
+            hvem = m.get("hvem", FELLES_VALG)
+            prof = hent_profil(hvem, medlemmer)
 
             c_info, c_slett = st.columns([0.84, 0.16])
             with c_info:
                 st.markdown(
                     f"""
-                    <div style="background-color: {bg_farge}; border-left: 4px solid {kant_farge}; padding: 8px 12px; border-radius: 6px; margin-bottom: 6px;">
-                        <span style="font-size: 1.05rem; font-weight: 700; color: #1F2937;">{m.get('ikon', '📌')} {m['tittel']}</span><br>
+                    <div style="background-color: {prof['bg']}; border-left: 5px solid {prof['kant']}; 
+                                padding: 8px 12px; border-radius: 8px; margin-bottom: 6px;">
+                        <span style="font-size: 1.05rem; font-weight: 800; color: #1F2937;">{m.get('ikon', '📌')} {m['tittel']}</span>
+                        <span style="background-color: {prof['badge']}; color: {prof['navn_farge']}; padding: 1px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700; margin-left: 6px;">
+                            {prof['ikon']} {hvem}
+                        </span><br>
                         <span style="font-size: 0.85rem; color: #4B5563;">📅 {m_dato.strftime('%d.%m.%Y')} — <b>{nedtelling}</b></span>
                     </div>
                     """,
@@ -581,20 +609,30 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager**", expanded=False):
 
     st.write("---")
     with st.form("form_ny_merkedag", clear_on_submit=True):
-        m_tittel = st.text_input("Hva skal skje?", placeholder="f.eks. Bursdag, Ferie, Tannlege")
-        col_d, col_i = st.columns([0.65, 0.35])
-        m_dato_valg = col_d.date_input("Dato:", min_value=idag_dato, value=idag_dato)
-        m_ikon = col_i.selectbox("Type:", ["🎂 Bursdag", "✈️ Ferie/Tur", "🦷 Tannlege/Lege", "🎒 Skole/Barnehage", "📌 Annet"])
+        st.markdown("##### ➕ Legg til aktivitet eller merkedag")
+        m_tittel = st.text_input("Hva skal skje?", placeholder="f.eks. Dans, Fotball, Bursdag")
+        col_h, col_i = st.columns([0.6, 0.4])
+        m_hvem = col_h.selectbox("Hvem gjelder det?", medlemmer + [FELLES_VALG])
+        m_ikon = col_i.selectbox("Type:", ["🩰 Dans", "⚽ Sport", "🎂 Bursdag", "🏊 Svømming", "🎒 Skole/SFO", "🦷 Tannlege", "✈️ Ferie", "📌 Annet"])
+        
+        m_dato_valg = st.date_input("Dato:", min_value=idag_dato, value=idag_dato)
+        col_gjenta, col_uker = st.columns([0.55, 0.45])
+        m_gjenta = col_gjenta.checkbox("🔄 Gjenta ukentlig", value=False)
+        m_antall_uker = col_uker.number_input("Antall uker:", min_value=2, max_value=40, value=10, disabled=not m_gjenta)
         
         if st.form_submit_button("Lagre i kalenderen", use_container_width=True) and m_tittel.strip():
-            data["merkedager"].append({
-                "id": str(uuid.uuid4()),
-                "tittel": m_tittel.strip(),
-                "dato": m_dato_valg.strftime("%Y-%m-%d"),
-                "ikon": m_ikon.split()[0]
-            })
+            antall_ganger = int(m_antall_uker) if m_gjenta else 1
+            for uke_nr in range(antall_ganger):
+                ny_dato = m_dato_valg + timedelta(weeks=uke_nr)
+                data["merkedager"].append({
+                    "id": str(uuid.uuid4()),
+                    "tittel": m_tittel.strip(),
+                    "dato": ny_dato.strftime("%Y-%m-%d"),
+                    "ikon": m_ikon.split()[0],
+                    "hvem": m_hvem
+                })
             lagre_naa()
-            st.toast("Merkedag lagret!")
+            st.toast("Aktivitet lagret!")
             st.rerun()
 
 # ----------------- OPPSLAGSTAVLE -----------------
@@ -649,87 +687,116 @@ faner = st.tabs(fane_navn)
 fane_oppgaver, fane_butikk, fane_middag, fane_handleliste, fane_aktiviteter = faner[0], faner[1], faner[2], faner[3], faner[4]
 fane_familie = faner[5] if er_forelder else None
 
-# ----------------- FANE 1: OPPGAVER & DIPLOM -----------------
+# ----------------- FANE 1: OPPGAVER & GODKJENNING -----------------
 with fane_oppgaver:
     oppgaver_oppdatert = False
     slett_id = None
     medlemmer = data.get("medlemmer", [])
     stjerne_brukere = data.get("stjerne_brukere", [])
 
-    with st.expander("🏆 **Ukens Stjernediplom (Trykk for å feire)**", expanded=False):
-        antall_lost = data.get("uke_oppgaver_lost", 0)
+    # 1. FORELDREGODKJENNING (Vises kun når foreldremodus er ulåst)
+    oppgaver_til_godkjenning = [o for o in data["oppgaver"] if o.get("status") == "venter"]
+    
+    if er_forelder and oppgaver_til_godkjenning:
         st.markdown(
             f"""
-            <div style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); 
-                        border: 3px dashed #F59E0B; border-radius: 16px; padding: 18px; text-align: center; margin-bottom: 8px;">
-                <div style="font-size: 2.2rem;">🎖️ 📜 🌟</div>
-                <h3 style="color: #92400E; margin: 4px 0 2px 0;">Ukens Superinnsats!</h3>
-                <p style="color: #B45309; font-size: 1.05rem; margin-bottom: 8px;">
-                    Familien har løst hele <b>{antall_lost} oppgaver</b> sammen denne uken!
-                </p>
-                <div style="font-size: 0.9rem; color: #78350F;">
-                    {' ⭐ '.join([f'<b>{p}:</b> {data["poeng"].get(p, 0)} ⭐' for p in stjerne_brukere])}
-                </div>
+            <div style="background: #FEF3C7; border: 2px solid #F59E0B; border-radius: 12px; padding: 12px; margin-bottom: 14px;">
+                <h4 style="margin: 0; color: #92400E;">🔔 {len(oppgaver_til_godkjenning)} oppgave(r) venter på foreldregodkjenning!</h4>
+                <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #B45309;">Sjekk jobben og trykk «Godkjenn» for å gi stjerner.</p>
             </div>
             """,
             unsafe_allow_html=True
         )
-        if st.button("🎉 Skyt opp konfetti!", use_container_width=True):
-            st.balloons()
 
+        for v_oppg in list(oppgaver_til_godkjenning):
+            v_id = v_oppg["id"]
+            hvem = v_oppg["hvem"]
+            stjerner = v_oppg.get("stjerner", 1)
+            prof = hent_profil(hvem, medlemmer)
+
+            col_v_tekst, col_v_godkjenn, col_v_avvis = st.columns([0.60, 0.25, 0.15])
+            with col_v_tekst:
+                st.markdown(
+                    f"""
+                    <div style="font-weight: 800; font-size: 1rem; color: #0F172A;">
+                        {v_oppg.get('ikon', '✨')} {v_oppg['tekst']}
+                    </div>
+                    <div style="font-size: 0.8rem; color: #475569;">
+                        Utført av: <b style="color: {prof['navn_farge']};">{prof['ikon']} {hvem}</b> (+{stjerner} ⭐)
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            with col_v_godkjenn:
+                if st.button("Godkjenn 👍", key=f"appr_{v_id}", use_container_width=True):
+                    v_oppg["status"] = "godkjent"
+                    if hvem in stjerne_brukere:
+                        data["poeng"][hvem] = data["poeng"].get(hvem, 0) + stjerner
+                        data["uke_oppgaver_lost"] = data.get("uke_oppgaver_lost", 0) + 1
+                    elif hvem == FELLES_VALG:
+                        hjelpere = v_oppg.get("fullfort_av", [])
+                        if not hjelpere: hjelpere = medlemmer
+                        stjerner_hver = max(1, round(stjerner / max(1, len(hjelpere))))
+                        for h in hjelpere:
+                            if h in stjerne_brukere:
+                                data["poeng"][h] = data["poeng"].get(h, 0) + stjerner_hver
+                        data["uke_oppgaver_lost"] = data.get("uke_oppgaver_lost", 0) + 1
+                    
+                    lagre_naa()
+                    st.balloons()
+                    st.toast(f"🎉 Godkjent! +{stjerner} ⭐ til {hvem}!")
+                    st.rerun()
+
+            with col_v_avvis:
+                if st.button("Avvis ↩️", key=f"revert_{v_id}", use_container_width=True, help="Sett tilbake til ugjort"):
+                    v_oppg["status"] = "ugjort"
+                    v_oppg["fullfort_av"] = None
+                    lagre_naa()
+                    st.toast("Oppgaven ble satt tilbake.")
+                    st.rerun()
+            st.divider()
+
+    # 2. STJERNETAVLE MED BARNAS FARGEPROFILER
     if stjerne_brukere:
         st.markdown("#### 🌟 Familiens Stjernetavle")
         kolonner = st.columns(len(stjerne_brukere))
         
         for idx, person in enumerate(stjerne_brukere):
             antall_stjerner = int(data["poeng"].get(person, 0))
+            prof = hent_profil(person, medlemmer)
+            
             with kolonner[idx]:
-                if antall_stjerner == 0:
-                    stjerne_symboler = "<span style='color: #CA8A04; opacity: 0.4;'>☆☆☆☆☆</span>"
-                    pluss_tekst = ""
-                    motivasjon = "<div style='font-size: 0.72rem; color: #854D0E; font-weight: 600; margin-top: 4px;'>🚀 Gjør en oppgave for å få din første stjerne!</div>"
-                else:
-                    synlige = min(antall_stjerner, 10)
-                    stjerne_symboler = "⭐" * synlige
-                    pluss_tekst = f" <span style='font-size: 0.8rem; font-weight: 700; color: #854D0E;'>(+{antall_stjerner - 10})</span>" if antall_stjerner > 10 else ""
-                    
-                    p_maal = data.get("sparemaal", {}).get(person)
-                    if p_maal:
-                        mangler = p_maal["pris"] - antall_stjerner
-                        if mangler <= 0:
-                            motivasjon = f"<div style='font-size: 0.75rem; color: #047857; font-weight: 700; margin-top: 4px;'>🎯 Målet nådd: {p_maal['tittel']}!</div>"
-                        else:
-                            motivasjon = f"<div style='font-size: 0.72rem; color: #B45309; margin-top: 4px;'>🎯 <b>{mangler} ⭐</b> til {p_maal['tittel']}</div>"
-                    else:
-                        motivasjon = ""
+                synlige = min(antall_stjerner, 8)
+                stjerne_symboler = "⭐" * synlige if synlige > 0 else "<span style='opacity: 0.3;'>☆☆☆☆</span>"
+                pluss_tekst = f" <span style='font-size: 0.8rem; font-weight: 800;'>(+{antall_stjerner - 8})</span>" if antall_stjerner > 8 else ""
 
                 st.markdown(
                     f"""
-                    <div style="background: linear-gradient(135deg, #FEF9C3 0%, #FEF08A 100%); 
-                                border: 2px solid #FACC15; border-radius: 12px; padding: 10px; 
-                                text-align: center; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                        <div style="font-size: 0.95rem; font-weight: 800; color: #854D0E;">👤 {person}</div>
-                        <div style="font-size: 1.8rem; font-weight: 900; color: #A16207; line-height: 1.1; margin: 4px 0;">
+                    <div style="background: {prof['bg']}; border: 3px solid {prof['kant']}; border-radius: 14px; 
+                                padding: 12px; text-align: center; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-size: 2rem; margin-bottom: -4px;">{prof['ikon']}</div>
+                        <div style="font-size: 1.1rem; font-weight: 900; color: {prof['navn_farge']};">{person}</div>
+                        <div style="font-size: 1.8rem; font-weight: 900; color: #0F172A; margin: 2px 0;">
                             {antall_stjerner} <span style="font-size: 1.3rem;">⭐</span>
                         </div>
-                        <div style="font-size: 1.05rem; letter-spacing: 2px; min-height: 22px;">
+                        <div style="font-size: 1rem; letter-spacing: 1px;">
                             {stjerne_symboler}{pluss_tekst}
                         </div>
-                        {motivasjon}
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
 
+    # Nullstill-knapper
     c_dag, c_uke = st.columns(2)
     with c_dag:
-        if st.button("☀️ Nullstill nå (Manuell)", use_container_width=True):
+        if st.button("☀️ Nullstill rutiner (Manuell)", use_container_width=True):
             for o in data["oppgaver"]:
                 if o.get("gjentakende", False):
-                    o["ferdig"] = False
+                    o["status"] = "ugjort"
                     o["fullfort_av"] = None
             lagre_naa()
-            st.toast("Daglige rutiner er nullstilt! ☀️")
+            st.toast("Daglige rutiner er klare for en ny dag! ☀️")
             st.rerun()
     with c_uke:
         if er_forelder:
@@ -738,134 +805,161 @@ with fane_oppgaver:
             st.caption("🔒 Ny uke krever PIN")
 
     st.write("")
-    for person in medlemmer:
-        er_samler = person in stjerne_brukere
-        poeng_badge = f" 🪙 {data['poeng'].get(person, 0)} ⭐" if er_samler else ""
-        person_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == person]
-        gjenstaende = len([o for o in person_oppgaver if not o["ferdig"]])
-        status_tekst = f"({gjenstaende} igjen)" if gjenstaende > 0 else "(Alt fullført! 🎉)"
 
-        with st.expander(f"👤 **{person}**{poeng_badge} — {status_tekst}", expanded=(gjenstaende > 0)):
+    # 3. OPPGAVELISTER PER PERSON MED FARGE- OG IKONPROFIL
+    for person in medlemmer:
+        prof = hent_profil(person, medlemmer)
+        person_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == person]
+        ugjorte = [o for o in person_oppgaver if o.get("status") == "ugjort"]
+        ventende = [o for o in person_oppgaver if o.get("status") == "venter"]
+        
+        status_tekst = f"({len(ugjorte)} igjen"
+        if ventende: status_tekst += f", {len(ventende)} venter på sjekk ⏳"
+        status_tekst += ")"
+        if not ugjorte and not ventende and person_oppgaver:
+            status_tekst = "(Alt er godkjent! 🎉)"
+
+        with st.expander(f"{prof['ikon']} **{person}** — {status_tekst}", expanded=(len(ugjorte) > 0 or len(ventende) > 0)):
+            if not person_oppgaver:
+                st.caption("Ingen oppgaver lagt til.")
+            
             for oppg in person_oppgaver:
                 oppg_id = oppg["id"]
-                merke = "🔄 " if oppg.get("gjentakende") else ""
-                tekst_visning = f"{merke}{oppg['tekst']}"
-                if oppg.get("stjerner", 0) > 0: tekst_visning += f" *(+{oppg['stjerner']} ⭐)*"
+                st_status = oppg.get("status", "ugjort")
+                stjerner = oppg.get("stjerner", 1)
+                ikon = oppg.get("ikon", "✨")
 
-                if er_forelder:
-                    c_chk, c_del = st.columns([0.85, 0.15])
-                    er_ferdig = c_chk.checkbox(tekst_visning, value=oppg["ferdig"], key=f"chk_{oppg_id}")
-                    if c_del.button("✕", key=f"del_{oppg_id}", help="Slett"): slett_id = oppg_id
+                # STIL FOR KORTET BASERT PÅ STATUS OG PERSONENS FARGE
+                if st_status == "godkjent":
+                    bg_kort, kant_kort = "#F1F5F9", "#CBD5E1"
+                    tekst_stil = "text-decoration: line-through; opacity: 0.6;"
+                    status_badge = "✅ Godkjent (+ stjerner gitt!)"
+                elif st_status == "venter":
+                    bg_kort, kant_kort = "#FEF3C7", "#F59E0B"
+                    tekst_stil = "font-weight: 700; color: #92400E;"
+                    status_badge = "⏳ Venter på at mor/far godkjenner..."
                 else:
-                    er_ferdig = st.checkbox(tekst_visning, value=oppg["ferdig"], key=f"chk_{oppg_id}")
+                    bg_kort, kant_kort = prof["bg"], prof["kant"]
+                    tekst_stil = f"font-weight: 800; color: #0F172A;"
+                    status_badge = f"+{stjerner} ⭐"
 
-                if er_ferdig != oppg["ferdig"]:
-                    oppg["ferdig"] = er_ferdig
-                    stjerner = oppg.get("stjerner", 0)
-                    if er_ferdig:
-                        if er_samler:
-                            data["poeng"][person] = data["poeng"].get(person, 0) + stjerner
-                            data["uke_oppgaver_lost"] = data.get("uke_oppgaver_lost", 0) + 1
-                            st.balloons()
+                st.markdown(
+                    f"""
+                    <div style="background-color: {bg_kort}; border-left: 6px solid {kant_kort}; 
+                                border-radius: 10px; padding: 10px 14px; margin-bottom: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 1.15rem; {tekst_stil}">
+                                <span style="font-size: 1.4rem; margin-right: 6px;">{ikon}</span> {oppg['tekst']}
+                            </span>
+                            <span style="background: rgba(255,255,255,0.8); border: 1px solid rgba(0,0,0,0.1); 
+                                         padding: 3px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 800;">
+                                {status_badge}
+                            </span>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                c_btn_utfør, c_btn_slett = st.columns([0.84, 0.16])
+                with c_btn_utfør:
+                    if st_status == "ugjort":
+                        if st.button(f"Jeg har gjort dette! 🎉", key=f"btn_done_{oppg_id}", use_container_width=True):
+                            oppg["status"] = "venter"
+                            lagre_naa()
+                            st.toast("Supert! Rop på mor eller far så de kan godkjenne! 👏")
+                            st.rerun()
+                    elif st_status == "venter":
+                        st.caption("⏳ Oppgaven venter på at en voksen trykker godkjenn i foreldremodus.")
                     else:
-                        if er_samler:
-                            data["poeng"][person] = max(0, data["poeng"].get(person, 0) - stjerner)
-                            data["uke_oppgaver_lost"] = max(0, data.get("uke_oppgaver_lost", 1) - 1)
-                    oppgaver_oppdatert = True
+                        st.caption("✨ Fullført for i dag!")
 
-    # Fellesoppgaver
+                with c_btn_slett:
+                    if er_forelder:
+                        if st.button("✕", key=f"del_op_{oppg_id}", help="Slett oppgave"):
+                            slett_id = oppg_id
+
+    # 4. FELLESEOPPGAVER
     felles_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == FELLES_VALG]
     if felles_oppgaver:
+        prof_felles = hent_profil(FELLES_VALG, medlemmer)
         with st.expander(f"🤝 **Fellesoppgaver** ({len(felles_oppgaver)})", expanded=True):
             for oppg in felles_oppgaver:
                 oppg_id = oppg["id"]
-                merke = "🔄 " if oppg.get("gjentakende") else ""
+                st_status = oppg.get("status", "ugjort")
                 tot_stjerner = oppg.get("stjerner", 2)
-                tekst_visning = f"{merke}{oppg['tekst']} *(+{tot_stjerner} ⭐)*"
+                ikon = oppg.get("ikon", "🤝")
 
-                fa_raw = oppg.get("fullfort_av")
-                if isinstance(fa_raw, list):
-                    tidligere_hjelpere = fa_raw
-                elif isinstance(fa_raw, str) and fa_raw:
-                    tidligere_hjelpere = [fa_raw]
-                else:
-                    tidligere_hjelpere = []
+                st.markdown(
+                    f"""
+                    <div style="background-color: {prof_felles['bg']}; border-left: 6px solid {prof_felles['kant']}; 
+                                border-radius: 10px; padding: 10px 14px; margin-bottom: 6px;">
+                        <span style="font-size: 1.15rem; font-weight: 800; color: #0F172A;">
+                            <span style="font-size: 1.4rem; margin-right: 6px;">{ikon}</span> {oppg['tekst']}
+                        </span>
+                        <span style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-left: 8px;">
+                            (+{tot_stjerner} ⭐ deles)
+                        </span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
-                if oppg["ferdig"] and tidligere_hjelpere:
-                    hjelper_tekst = ", ".join(tidligere_hjelpere)
-                    tekst_visning += f" — *(Hjelpere: {hjelper_tekst})*"
-
-                c_f_chk, c_f_who = st.columns([0.55, 0.45])
-                er_ferdig = c_f_chk.checkbox(tekst_visning, value=oppg["ferdig"], key=f"f_chk_{oppg_id}")
-                
-                if not oppg["ferdig"]:
+                if st_status == "ugjort":
+                    c_f_who, c_f_btn = st.columns([0.65, 0.35])
                     valgte_hjelpere = c_f_who.multiselect(
                         "Hvem hjalp til?",
                         options=medlemmer,
                         default=[medlemmer[0]] if medlemmer else [],
-                        key=f"f_who_{oppg_id}",
-                        label_visibility="collapsed"
+                        key=f"f_who_{oppg_id}"
                     )
+                    if c_f_btn.button("Meld inn! 🎉", key=f"f_done_{oppg_id}", use_container_width=True):
+                        oppg["status"] = "venter"
+                        oppg["fullfort_av"] = valgte_hjelpere
+                        lagre_naa()
+                        st.toast("Fellesoppgave meldt inn til godkjenning! 👏")
+                        st.rerun()
+                elif st_status == "venter":
+                    hjelpere_str = ", ".join(oppg.get("fullfort_av", []))
+                    st.info(f"⏳ Venter på foreldregodkjenning. (Hjelpere meldt inn: {hjelpere_str})")
                 else:
-                    c_f_who.write("")
-                    valgte_hjelpere = tidligere_hjelpere
+                    st.caption("✨ Godkjent og stjerner er utdelt!")
 
                 if er_forelder and st.button("Slett fellesoppgave ✕", key=f"f_del_{oppg_id}"):
                     slett_id = oppg_id
-
-                if er_ferdig != oppg["ferdig"]:
-                    oppg["ferdig"] = er_ferdig
-                    
-                    if er_ferdig:
-                        hjelpere_aa_belonne = valgte_hjelpere if valgte_hjelpere else ([medlemmer[0]] if medlemmer else [])
-                        oppg["fullfort_av"] = hjelpere_aa_belonne
-                        antall_hjelpere = max(1, len(hjelpere_aa_belonne))
-                        stjerner_hver = max(1, round(tot_stjerner / antall_hjelpere))
-                        
-                        for h in hjelpere_aa_belonne:
-                            if h in stjerne_brukere:
-                                data["poeng"][h] = data["poeng"].get(h, 0) + stjerner_hver
-                        
-                        data["uke_oppgaver_lost"] = data.get("uke_oppgaver_lost", 0) + 1
-                        st.balloons()
-                        st.toast(f"🎉 Samarbeidsbonus! +{stjerner_hver} ⭐ til hver.")
-                    else:
-                        gamle_hjelpere = tidligere_hjelpere
-                        antall_for = max(1, len(gamle_hjelpere))
-                        trekk_hver = max(1, round(tot_stjerner / antall_for))
-                        for h in gamle_hjelpere:
-                            if h in stjerne_brukere:
-                                data["poeng"][h] = max(0, data["poeng"].get(h, 0) - trekk_hver)
-                        oppg["fullfort_av"] = None
-                        data["uke_oppgaver_lost"] = max(0, data.get("uke_oppgaver_lost", 1) - 1)
-
-                    oppgaver_oppdatert = True
 
     if slett_id:
         data["oppgaver"] = [o for o in data["oppgaver"] if o["id"] != slett_id]
         lagre_naa()
         st.rerun()
 
-    if oppgaver_oppdatert:
-        lagre_naa()
-        st.rerun()
-
+    # 5. FORELDRE: LEGG TIL NY OPPGAVE MED IKONVELGER
     if er_forelder:
         st.write("---")
-        with st.expander("➕ **Legg til ny oppgave**"):
+        with st.expander("➕ **Legg til ny oppgave (for voksne)**"):
             with st.form("form_ny_oppg", clear_on_submit=True):
-                oppg_tekst = st.text_input("Gjøremål:")
+                col_t, col_ik = st.columns([0.75, 0.25])
+                oppg_tekst = col_t.text_input("Gjøremål:", placeholder="f.eks. Pusse tenner, Re opp sengen")
+                oppg_ikon = col_ik.selectbox("Ikon:", ["🪥", "🛏️", "🧸", "👟", "🍽️", "🎒", "🐶", "🧺", "📚", "🚿", "✨"])
+                
                 valgte = st.multiselect("Til hvem?", [FELLES_VALG] + medlemmer, default=[medlemmer[0]] if medlemmer else [])
-                stjerner = st.number_input("Stjerner (deles ved fellesoppgave):", min_value=1, max_value=20, value=2)
-                er_daglig = st.checkbox("🔄 Daglig rutine", value=True)
+                stjerner = st.number_input("Stjerner belønning:", min_value=1, max_value=20, value=1)
+                er_daglig = st.checkbox("🔄 Daglig rutine (nullstilles hver natt)", value=True)
+                
                 if st.form_submit_button("Lagre oppgave", use_container_width=True) and oppg_tekst.strip() and valgte:
                     for p in valgte:
                         data["oppgaver"].append({
-                            "id": str(uuid.uuid4()), "tekst": oppg_tekst.strip(), "hvem": p,
-                            "ferdig": False, "stjerner": int(stjerner), "fullfort_av": None, "gjentakende": er_daglig
+                            "id": str(uuid.uuid4()),
+                            "ikon": oppg_ikon,
+                            "tekst": oppg_tekst.strip(),
+                            "hvem": p,
+                            "status": "ugjort",
+                            "stjerner": int(stjerner),
+                            "fullfort_av": None,
+                            "gjentakende": er_daglig
                         })
                     lagre_naa()
-                    st.toast("Oppgave lagt til!")
+                    st.toast("Oppgave lagret med farge og ikon!")
                     st.rerun()
 
 # ----------------- FANE 2: BUTIKK & SPAREMÅL -----------------
@@ -877,6 +971,7 @@ with fane_butikk:
         for p in stjerne_brukere:
             saldo = data["poeng"].get(p, 0)
             maal_info = data.get("sparemaal", {}).get(p)
+            prof = hent_profil(p, medlemmer)
             
             with st.container():
                 if maal_info:
@@ -885,7 +980,7 @@ with fane_butikk:
                     framgang = min(1.0, saldo / maal_pris)
                     prosent = int(framgang * 100)
                     
-                    st.markdown(f"**👤 {p} sparer til: {maal_tittel}** (`{saldo} / {maal_pris} ⭐` — {prosent}%)")
+                    st.markdown(f"**{prof['ikon']} {p} sparer til: {maal_tittel}** (`{saldo} / {maal_pris} ⭐` — {prosent}%)")
                     st.progress(framgang)
                     
                     c_m1, c_m2 = st.columns([0.65, 0.35])
@@ -900,7 +995,7 @@ with fane_butikk:
                             lagre_naa()
                             st.rerun()
                 else:
-                    st.info(f"👤 {p} har ikke satt noe sparemål enda.")
+                    st.info(f"{prof['ikon']} {p} har ikke satt noe sparemål enda.")
                     with st.expander(f"➕ Sett sparemål for {p}"):
                         with st.form(f"form_maal_{p}"):
                             ny_m_tittel = st.text_input("Hva sparer du til?", placeholder="f.eks. Lego-sett, Tur til badeland")
@@ -1246,7 +1341,8 @@ if er_forelder and fane_familie:
 
         st.markdown("#### 👤 Familiemedlemmer")
         for i, person in enumerate(list(data["medlemmer"])):
-            st.markdown(f"**Person {i+1}: {person}**")
+            prof = hent_profil(person, data["medlemmer"])
+            st.markdown(f"**Person {i+1}: {prof['ikon']} {person}**")
             nytt_navn = st.text_input(f"Navn", value=person, key=f"adm_navn_{i}")
             er_stjernesamler = person in data.get("stjerne_brukere", [])
             skal_ha = st.checkbox("Samler stjerner ⭐", value=er_stjernesamler, key=f"adm_stj_{i}")
@@ -1259,10 +1355,6 @@ if er_forelder and fane_familie:
                 if gammelt in data.get("poeng", {}): data["poeng"][nytt] = data["poeng"].pop(gammelt)
                 for o in data.get("oppgaver", []):
                     if o["hvem"] == gammelt: o["hvem"] = nytt
-                    if isinstance(o.get("fullfort_av"), list):
-                        o["fullfort_av"] = [nytt if x == gammelt else x for x in o["fullfort_av"]]
-                    elif o.get("fullfort_av") == gammelt:
-                        o["fullfort_av"] = nytt
                 lagre_naa()
                 st.rerun()
 
@@ -1353,4 +1445,3 @@ with c_b2:
         st.session_state["foreldremodus"] = False
         st.query_params.clear()
         st.rerun()
-    
