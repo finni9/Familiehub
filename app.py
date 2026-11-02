@@ -1348,7 +1348,7 @@ with fane_statistikk:
     else:
         st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE 4: MIDDAG & FRYSER (KOMPAKT RUTENETT) -----------------
+# ----------------- FANE 4: MIDDAG & FRYSER (MED KOMPAKTE RADER & SIKRET 🛒-KNAPP) -----------------
 with fane_middag:
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
         fryser_varer = data.get("fryser", [])
@@ -1406,7 +1406,7 @@ with fane_middag:
 
     st.write("---")
     
-    # KOMPAKT RUTENETT FOR DAGENE (2 OG 2 SAMMEN)
+    # KOMPAKT RUTENETT FOR DAGENE (2 OG 2 SAMMEN, SAMT LITE HODE MED SPIST-KNAPP)
     st.markdown("#### 📅 Ukens Middagsplan")
     
     dag_rader = [
@@ -1424,21 +1424,26 @@ with fane_middag:
             with kols[idx]:
                 er_idag = (dag == idag_navn)
                 valgt_rett = st.session_state.get(f"rett_{dag}", "")
-                
-                kant_farge = "#3B82F6" if er_idag else "#334155"
-                bg_farge = "#1E293B" if er_idag else "#0F172A"
-                badge_idag = " <span style='background-color: #3B82F6; color: #FFFFFF; font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; font-weight: 800;'>I DAG</span>" if er_idag else ""
+                badge_idag = " <span style='background-color: #3B82F6; color: #FFFFFF; font-size: 0.68rem; padding: 1px 5px; border-radius: 5px; font-weight: 800;'>I DAG</span>" if er_idag else ""
 
-                st.markdown(
-                    f"""
-                    <div style="background-color: {bg_farge}; border: 1.5px solid {kant_farge}; border-radius: 10px; padding: 8px 10px 4px 10px; margin-bottom: 6px;">
-                        <span style="font-weight: 800; font-size: 0.95rem; color: #FFFFFF;">{dag}{badge_idag}</span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                # TOPPLINJE PÅ KORTET: Dagnavn til venstre, "🍽️ Spist"-knapp kompakt til høyre hvis det er i dag
+                if er_idag and valgt_rett.strip():
+                    c_dag_navn, c_spist = st.columns([0.62, 0.38])
+                    with c_dag_navn:
+                        st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
+                    with c_spist:
+                        if st.button("🍽️ Spist", key=f"spist_btn_{dag}", help="Marker som spist og stryk fra fryseren hvis råvaren fantes", use_container_width=True):
+                            slettet, slettet_navn = slett_vare_fra_fryser_ved_navn(valgt_rett)
+                            if slettet:
+                                st.balloons()
+                                st.toast(f"🎉 '{slettet_navn}' er nå strøket fra fryseren!")
+                            else:
+                                st.toast(f"Middagen for {dag} er spist! 🍽️")
+                else:
+                    st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 2px;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
 
-                c_inn, c_kjop = st.columns([0.78, 0.22])
+                # INNDATAFELT OG HANDLEVOGN-KNAPP PÅ SAMME LINJE (KNAPPEN VISES ALLTID)
+                c_inn, c_kjop = st.columns([0.80, 0.20])
                 ny_rett = c_inn.text_input(
                     f"Rett {dag}", 
                     value=valgt_rett, 
@@ -1447,20 +1452,18 @@ with fane_middag:
                     label_visibility="collapsed"
                 )
                 
-                if ny_rett in oppskrifter and c_kjop.button("🛒", key=f"kjop_dag_{dag}", help=f"Kjøp til {ny_rett}"):
-                    for i_navn in oppskrifter[ny_rett].get("ingredienser", []):
-                        legg_til_vare_i_data(i_navn)
-                    lagre_naa()
-                    st.toast(f"Ingredienser til {ny_rett} lagt til!")
-
-                if er_idag and valgt_rett.strip():
-                    if st.button("🍽️ Spist (stryk råvare)", key=f"spist_btn_{dag}", use_container_width=True):
-                        slettet, slettet_navn = slett_vare_fra_fryser_ved_navn(valgt_rett)
-                        if slettet:
-                            st.balloons()
-                            st.toast(f"🎉 '{slettet_navn}' er nå strøket fra fryseren!")
-                        else:
-                            st.toast("Middag registrert som spist!")
+                har_tekst = bool(ny_rett.strip())
+                if c_kjop.button("🛒", key=f"kjop_dag_{dag}", disabled=not har_tekst, help=f"Kjøp inn til {ny_rett}" if har_tekst else "Skriv inn middag først", use_container_width=True):
+                    renset = ny_rett.strip()
+                    if renset in oppskrifter and oppskrifter[renset].get("ingredienser"):
+                        for i_navn in oppskrifter[renset]["ingredienser"]:
+                            legg_til_vare_i_data(i_navn)
+                        lagre_naa()
+                        st.toast(f"Ingredienser til '{renset}' lagt til i handlelisten! 🛒")
+                    else:
+                        legg_til_vare_i_data(renset)
+                        lagre_naa()
+                        st.toast(f"'{renset}' lagt til i handlelisten! 🛒")
 
                 if ny_rett != data["middagsplan"].get(dag, ""):
                     data["middagsplan"][dag] = ny_rett
@@ -1618,7 +1621,7 @@ with fane_aktiviteter:
     if "trukket_aktivitet" in st.session_state:
         st.markdown(
             f"""
-            <div style="background-color: #064E3B; border: 2px solid #10B981; border-radius: 12px; padding: 18px; text-align: center; margin: 14px 0;">
+            <div style="background-color: #064E3B; border: 2px solid #10B981; border-radius: 12px; padding: 18px; text-align: center; margin-14px 0;">
                 <div style="font-size: 1.1rem; color: #A7F3D0; font-weight: 800;">Dagens utvalgte aktivitet:</div>
                 <div style="font-size: 1.45rem; font-weight: 900; color: #FFFFFF; margin-top: 6px;">
                     {st.session_state['trukket_aktivitet']}
