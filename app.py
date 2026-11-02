@@ -112,14 +112,13 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
-# ----------------- HØYKONTRAST-PROFILER (RENE CSS-VERDIER) -----------------
 PERSON_PROFILER = [
-    {"bg": "#1D4ED8", "kant": "#60A5FA", "tekst": "#FFFFFF", "badge": "#1E40AF", "ikon": "🦁"},  # Kongeblå
-    {"bg": "#BE185D", "kant": "#F472B6", "tekst": "#FFFFFF", "badge": "#9D174D", "ikon": "🐰"},  # Magenta/Rosa
-    {"bg": "#B45309", "kant": "#FBBF24", "tekst": "#FFFFFF", "badge": "#92400E", "ikon": "🐻"},  # Rav/Gull
-    {"bg": "#047857", "kant": "#34D399", "tekst": "#FFFFFF", "badge": "#065F46", "ikon": "🦊"},  # Smaragdgrønn
-    {"bg": "#6D28D9", "kant": "#A78BFA", "tekst": "#FFFFFF", "badge": "#5B21B6", "ikon": "🐼"},  # Lilla
-    {"bg": "#C2410C", "kant": "#FB923C", "tekst": "#FFFFFF", "badge": "#9A3412", "ikon": "🐯"},  # Oransje
+    {"bg": "#1D4ED8", "kant": "#60A5FA", "tekst": "#FFFFFF", "badge": "#1E40AF", "ikon": "🦁"},
+    {"bg": "#BE185D", "kant": "#F472B6", "tekst": "#FFFFFF", "badge": "#9D174D", "ikon": "🐰"},
+    {"bg": "#B45309", "kant": "#FBBF24", "tekst": "#FFFFFF", "badge": "#92400E", "ikon": "🐻"},
+    {"bg": "#047857", "kant": "#34D399", "tekst": "#FFFFFF", "badge": "#065F46", "ikon": "🦊"},
+    {"bg": "#6D28D9", "kant": "#A78BFA", "tekst": "#FFFFFF", "badge": "#5B21B6", "ikon": "🐼"},
+    {"bg": "#C2410C", "kant": "#FB923C", "tekst": "#FFFFFF", "badge": "#9A3412", "ikon": "🐯"},
 ]
 
 def hent_profil(person, alle_medlemmer):
@@ -237,6 +236,7 @@ def standard_data(valgt_pin="1234"):
         "poeng": {"Far": 0, "Mor": 0, "Barn 1": 0, "Barn 2": 0},
         "sparemaal": {},
         "aktiviteter": STANDARD_AKTIVITETER,
+        "stjerne_logg": [],
         "fryser": [
             {"id": str(uuid.uuid4()), "navn": "Laksefilet (4 pk)"},
             {"id": str(uuid.uuid4()), "navn": "Hjemmelaget Bolognese"}
@@ -424,6 +424,7 @@ if "sparemaal" not in raw_data: raw_data["sparemaal"] = {}
 if "aktiviteter" not in raw_data: raw_data["aktiviteter"] = STANDARD_AKTIVITETER
 if "fryser" not in raw_data: raw_data["fryser"] = []
 if "uke_oppgaver_lost" not in raw_data: raw_data["uke_oppgaver_lost"] = 0
+if "stjerne_logg" not in raw_data: raw_data["stjerne_logg"] = []
 
 raw_data["oppgaver"] = migrer_oppgaver(raw_data.get("oppgaver", []))
 raw_data["handleliste"] = migrer_handleliste(raw_data.get("handleliste", []))
@@ -433,6 +434,23 @@ data = raw_data
 
 def lagre_naa():
     return lagre_familie_data(aktiv_kode, data)
+
+def logg_stjerne_hendelse(person, handling_type, antall, beskrivelse):
+    naa_tid = datetime.now(TIDSSONE_NORGE)
+    if "stjerne_logg" not in data:
+        data["stjerne_logg"] = []
+    data["stjerne_logg"].append({
+        "id": str(uuid.uuid4()),
+        "tid": naa_tid.strftime("%Y-%m-%d %H:%M"),
+        "aar_mnd": naa_tid.strftime("%Y-%m"),
+        "person": person,
+        "type": handling_type,
+        "antall": int(antall),
+        "beskrivelse": beskrivelse
+    })
+    # Behold de siste 250 loggførte hendelsene
+    if len(data["stjerne_logg"]) > 250:
+        data["stjerne_logg"] = data["stjerne_logg"][-250:]
 
 # ----------------- MIDNATT-NULLSTILLING -----------------
 idag_dato = datetime.now(TIDSSONE_NORGE).date()
@@ -776,21 +794,21 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
 
 er_forelder = st.session_state["foreldremodus"]
 
-fane_navn = ["⭐ Oppgaver", "🎁 Butikk & Mål", "🍽️ Middag & Fryser", "🛒 Handleliste", "🎲 Aktiviteter"]
+fane_navn = ["⭐ Oppgaver", "🎁 Butikk & Mål", "📊 Stjernelogg", "🍽️ Middag & Fryser", "🛒 Handleliste", "🎲 Aktiviteter"]
 if er_forelder: fane_navn.append("👨‍👩‍👧‍👦 Admin")
 
 faner = st.tabs(fane_navn)
-fane_oppgaver, fane_butikk, fane_middag, fane_handleliste, fane_aktiviteter = faner[0], faner[1], faner[2], faner[3], faner[4]
-fane_familie = faner[5] if er_forelder else None
+fane_oppgaver, fane_butikk, fane_statistikk, fane_middag, fane_handleliste, fane_aktiviteter = faner[0], faner[1], faner[2], faner[3], faner[4], faner[5]
+fane_familie = faner[6] if er_forelder else None
 
-# ----------------- FANE 1: OPPGAVER & GODKJENNING (HELT UTEN !IMPORTANT) -----------------
+# ----------------- FANE 1: OPPGAVER & GODKJENNING -----------------
 with fane_oppgaver:
     oppgaver_oppdatert = False
     slett_id = None
     medlemmer = data.get("medlemmer", [])
     stjerne_brukere = data.get("stjerne_brukere", [])
 
-    # 1. FORELDREGODKJENNING
+    # 1. FORELDREGODKJENNING MED AUTOMATISK LOGGFØRING
     oppgaver_til_godkjenning = [o for o in data["oppgaver"] if o.get("status") == "venter"]
     
     if er_forelder and oppgaver_til_godkjenning:
@@ -829,6 +847,7 @@ with fane_oppgaver:
                     if hvem in stjerne_brukere:
                         data["poeng"][hvem] = data["poeng"].get(hvem, 0) + stjerner
                         data["uke_oppgaver_lost"] = data.get("uke_oppgaver_lost", 0) + 1
+                        logg_stjerne_hendelse(hvem, "tjent", stjerner, v_oppg["tekst"])
                     elif hvem == FELLES_VALG:
                         hjelpere = v_oppg.get("fullfort_av", [])
                         if not hjelpere: hjelpere = medlemmer
@@ -836,6 +855,7 @@ with fane_oppgaver:
                         for h in hjelpere:
                             if h in stjerne_brukere:
                                 data["poeng"][h] = data["poeng"].get(h, 0) + stjerner_hver
+                                logg_stjerne_hendelse(h, "tjent", stjerner_hver, f"{v_oppg['tekst']} (Felles)")
                         data["uke_oppgaver_lost"] = data.get("uke_oppgaver_lost", 0) + 1
                     
                     lagre_naa()
@@ -1139,6 +1159,7 @@ with fane_butikk:
             har_rad = data["poeng"].get(hvem_kjoper, 0) >= bel["pris"]
             if st.button("Løs inn 🎉", key=f"btn_kjop_{bel['id']}", disabled=not har_rad, use_container_width=True):
                 data["poeng"][hvem_kjoper] -= bel["pris"]
+                logg_stjerne_hendelse(hvem_kjoper, "brukt", bel["pris"], bel["tittel"])
                 lagre_naa()
                 st.balloons()
                 st.toast(f"🎉 Gratulerer {hvem_kjoper}!")
@@ -1163,7 +1184,124 @@ with fane_butikk:
                     lagre_naa()
                     st.rerun()
 
-# ----------------- FANE 3: MIDDAG & FRYSER -----------------
+# ----------------- FANE 3: STJERNELOGG & MÅNEDSSTATISTIKK -----------------
+with fane_statistikk:
+    st.subheader("📊 Månedlig Stjernelogg & Statistikk")
+    st.caption("Følg med på familiens innsats og se om dere er i god flyt måned for måned!")
+
+    logg = data.get("stjerne_logg", [])
+    stjerne_brukere = data.get("stjerne_brukere", [])
+
+    # Beregn nåværende måned og forrige måned
+    denne_mnd_key = idag_dato.strftime("%Y-%m")
+    
+    # Finn forrige måneds nøkkel (håndterer også årsskifte)
+    forste_denne_mnd = idag_dato.replace(day=1)
+    siste_forrige_mnd = forste_denne_mnd - timedelta(days=1)
+    forrige_mnd_key = siste_forrige_mnd.strftime("%Y-%m")
+
+    denne_mnd_navn = MAANEDER[idag_dato.month - 1].capitalize()
+    forrige_mnd_navn = MAANEDER[siste_forrige_mnd.month - 1].capitalize()
+
+    # Beregn totaler
+    tjent_denne = sum(x["antall"] for x in logg if x.get("aar_mnd") == denne_mnd_key and x.get("type") == "tjent")
+    brukt_denne = sum(x["antall"] for x in logg if x.get("aar_mnd") == denne_mnd_key and x.get("type") == "brukt")
+
+    tjent_forrige = sum(x["antall"] for x in logg if x.get("aar_mnd") == forrige_mnd_key and x.get("type") == "tjent")
+    brukt_forrige = sum(x["antall"] for x in logg if x.get("aar_mnd") == forrige_mnd_key and x.get("type") == "brukt")
+
+    # Sammenligningskort
+    diff_tjent = tjent_denne - tjent_forrige
+    if tjent_forrige == 0 and tjent_denne > 0:
+        trend_tekst = f"🚀 Flott start på {denne_mnd_navn}! Familien har allerede tjent **{tjent_denne} ⭐**!"
+        trend_farge = "#10B981"
+    elif diff_tjent > 0:
+        trend_tekst = f"🔥 Fantastisk innsats! Dere har tjent **+{diff_tjent} flere ⭐** i {denne_mnd_navn} enn i {forrige_mnd_navn}!"
+        trend_farge = "#10B981"
+    elif diff_tjent == 0:
+        trend_tekst = f"⚖️ Familien holder jevnt og stødig tempo likt som i {forrige_mnd_navn}!"
+        trend_farge = "#3B82F6"
+    else:
+        trend_tekst = f"💪 Dere ligger {abs(diff_tjent)} ⭐ bak fjorårets/forrige måneds nivå ({forrige_mnd_navn}). Klarer dere å ta det igjen?"
+        trend_farge = "#F59E0B"
+
+    st.markdown(
+        f"""
+        <div style="background-color: #1E293B; border-left: 6px solid {trend_farge}; border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+            <div style="font-size: 1.05rem; font-weight: 800; color: #FFFFFF; margin-bottom: 4px;">{trend_tekst}</div>
+            <div style="font-size: 0.85rem; color: #94A3B8;">
+                {denne_mnd_navn}: <b>{tjent_denne} ⭐ tjent</b> ({brukt_denne} brukt) &nbsp;|&nbsp; 
+                {forrige_mnd_navn}: <b>{tjent_forrige} ⭐ tjent</b> ({brukt_forrige} brukt)
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Statistikk fordelt per barn denne måneden
+    if stjerne_brukere:
+        st.markdown(f"##### 👤 Barnas innsats i {denne_mnd_navn}")
+        kols = st.columns(len(stjerne_brukere))
+        for idx, person in enumerate(stjerne_brukere):
+            prof = hent_profil(person, medlemmer)
+            p_tjent = sum(x["antall"] for x in logg if x.get("aar_mnd") == denne_mnd_key and x.get("type") == "tjent" and x.get("person") == person)
+            p_brukt = sum(x["antall"] for x in logg if x.get("aar_mnd") == denne_mnd_key and x.get("type") == "brukt" and x.get("person") == person)
+
+            with kols[idx]:
+                st.markdown(
+                    f"""
+                    <div style="background-color: {prof['bg']}; border: 2px solid {prof['kant']}; border-radius: 12px; padding: 10px; text-align: center;">
+                        <div style="font-size: 1.5rem;">{prof['ikon']}</div>
+                        <div style="font-size: 1.05rem; font-weight: 900; color: #FFFFFF;">{person}</div>
+                        <div style="font-size: 1.3rem; font-weight: 900; color: #FCD34D; margin: 4px 0;">+{p_tjent} ⭐</div>
+                        <div style="font-size: 0.75rem; color: #E2E8F0;">Brukt: {p_brukt} ⭐</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+    st.write("---")
+
+    # Siste hendelser i loggen
+    st.markdown("##### 📜 Siste stjerneaktiviteter")
+    if logg:
+        siste_hendelser = list(reversed(logg))[:15]
+        for h in siste_hendelser:
+            h_person = h.get("person", "Familien")
+            prof = hent_profil(h_person, medlemmer)
+            h_type = h.get("type", "tjent")
+            h_antall = h.get("antall", 1)
+            h_tekst = h.get("beskrivelse", "Gjøremål")
+            h_tid = h.get("tid", "")
+
+            if h_type == "tjent":
+                symbol = f"+{h_antall} ⭐"
+                farge_txt = "#34D399"
+                badge_t = "TJENT"
+            else:
+                symbol = f"-{h_antall} ⭐"
+                farge_txt = "#F87171"
+                badge_t = "BRUKT"
+
+            st.markdown(
+                f"""
+                <div style="display: flex; justify-content: space-between; align-items: center; background-color: #0F172A; border-left: 4px solid {prof['kant']}; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;">
+                    <div>
+                        <span style="font-weight: 800; color: #FFFFFF; font-size: 0.95rem;">{prof['ikon']} {h_person}:</span> 
+                        <span style="color: #CBD5E1; font-size: 0.9rem;">{h_tekst}</span>
+                        <div style="font-size: 0.7rem; color: #64748B;">🕒 {h_tid}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 1.1rem; font-weight: 900; color: {farge_txt};">{symbol}</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    else:
+        st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
+
+# ----------------- FANE 4: MIDDAG & FRYSER -----------------
 with fane_middag:
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
         fryser_varer = data.get("fryser", [])
@@ -1293,7 +1431,7 @@ with fane_middag:
                 ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
                 nytt_opp_bilde = st.file_uploader("Bilde av retten (valgfritt):", type=["png", "jpg", "jpeg"])
                 
-                if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
+                if st.form_submit_button("Lagre oppgave", use_container_width=True) and ny_r.strip():
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
@@ -1301,7 +1439,7 @@ with fane_middag:
                         st.toast(f"{ny_r.strip()} er lagt til!")
                         st.rerun()
 
-# ----------------- FANE 4: HANDLELISTE -----------------
+# ----------------- FANE 5: HANDLELISTE -----------------
 with fane_handleliste:
     st.subheader("🛒 Handleliste")
 
@@ -1382,7 +1520,7 @@ with fane_handleliste:
             lagre_naa()
             st.rerun()
 
-# ----------------- FANE 5: AKTIVITETER -----------------
+# ----------------- FANE 6: AKTIVITETER -----------------
 with fane_aktiviteter:
     st.subheader("🎲 Hva skal vi finne på?")
     st.caption("Trykk på knappen for å trekke en morsom idé til hva familien kan gjøre sammen!")
@@ -1432,7 +1570,7 @@ with fane_aktiviteter:
                     lagre_naa()
                     st.rerun()
 
-# ----------------- FANE 6: ADMIN -----------------
+# ----------------- FANE 7: ADMIN -----------------
 if er_forelder and fane_familie:
     with fane_familie:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
