@@ -448,7 +448,6 @@ def logg_stjerne_hendelse(person, handling_type, antall, beskrivelse):
         "antall": int(antall),
         "beskrivelse": beskrivelse
     })
-    # Behold de siste 250 loggførte hendelsene
     if len(data["stjerne_logg"]) > 250:
         data["stjerne_logg"] = data["stjerne_logg"][-250:]
 
@@ -505,6 +504,64 @@ def cb_auto_planlegg(oppskriftsliste):
         data["middagsplan"][dag] = ny_rett
         st.session_state[f"rett_{dag}"] = ny_rett
     lagre_naa()
+
+def cb_planlegg_fra_fryser(oppskrifter, fryser_varer):
+    if not oppskrifter:
+        return
+    
+    fryser_tekster = [f["navn"].lower() for f in fryser_varer]
+    matcher = []
+    andre_retter = []
+    
+    for rett_navn, info in oppskrifter.items():
+        ingredienser = [i.lower() for i in info.get("ingredienser", [])]
+        matchet = False
+        
+        for f_vare in fryser_tekster:
+            ord_deler = [ord_ren for ord_ren in f_vare.split() if len(ord_ren) > 2]
+            if any(ord_del in rett_navn.lower() for ord_del in ord_deler) or \
+               any(any(ord_del in ingr for ord_del in ord_deler) for ingr in ingredienser):
+                matcher.append(rett_navn)
+                matchet = True
+                break
+        
+        if not matchet:
+            andre_retter.append(rett_navn)
+            
+    matcher = list(dict.fromkeys(matcher))
+    random.shuffle(matcher)
+    random.shuffle(andre_retter)
+    
+    valgt_meny = (matcher + andre_retter)[:7]
+    while len(valgt_meny) < 7 and (matcher or andre_retter):
+        valgt_meny.append(random.choice(matcher + andre_retter))
+        
+    for i, dag in enumerate(DAGER):
+        if i < len(valgt_meny):
+            ny_rett = valgt_meny[i]
+            data["middagsplan"][dag] = ny_rett
+            st.session_state[f"rett_{dag}"] = ny_rett
+            
+    lagre_naa()
+
+def slett_vare_fra_fryser_ved_navn(rett_eller_ingrediens):
+    tekst = rett_eller_ingrediens.lower()
+    funnet_id = None
+    funnet_navn = ""
+    
+    for f in data.get("fryser", []):
+        f_navn = f["navn"].lower()
+        ord_deler = [o for o in f_navn.split() if len(o) > 2]
+        if f_navn in tekst or any(o in tekst for o in ord_deler):
+            funnet_id = f["id"]
+            funnet_navn = f["navn"]
+            break
+            
+    if funnet_id:
+        data["fryser"] = [x for x in data["fryser"] if x["id"] != funnet_id]
+        lagre_naa()
+        return True, funnet_navn
+    return False, ""
 
 def cb_start_ny_uke():
     data["oppgaver"] = [o for o in data["oppgaver"] if o.get("gjentakende", False) or o.get("status") != "godkjent"]
@@ -808,7 +865,7 @@ with fane_oppgaver:
     medlemmer = data.get("medlemmer", [])
     stjerne_brukere = data.get("stjerne_brukere", [])
 
-    # 1. FORELDREGODKJENNING MED AUTOMATISK LOGGFØRING
+    # 1. FORELDREGODKJENNING
     oppgaver_til_godkjenning = [o for o in data["oppgaver"] if o.get("status") == "venter"]
     
     if er_forelder and oppgaver_til_godkjenning:
@@ -921,7 +978,7 @@ with fane_oppgaver:
 
     st.write("")
 
-    # 3. OPPGAVER MED BEHOLDTE METTEDE FARGER
+    # 3. OPPGAVER PER PERSON
     for person in medlemmer:
         prof = hent_profil(person, medlemmer)
         person_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == person]
@@ -1192,10 +1249,7 @@ with fane_statistikk:
     logg = data.get("stjerne_logg", [])
     stjerne_brukere = data.get("stjerne_brukere", [])
 
-    # Beregn nåværende måned og forrige måned
     denne_mnd_key = idag_dato.strftime("%Y-%m")
-    
-    # Finn forrige måneds nøkkel (håndterer også årsskifte)
     forste_denne_mnd = idag_dato.replace(day=1)
     siste_forrige_mnd = forste_denne_mnd - timedelta(days=1)
     forrige_mnd_key = siste_forrige_mnd.strftime("%Y-%m")
@@ -1203,14 +1257,12 @@ with fane_statistikk:
     denne_mnd_navn = MAANEDER[idag_dato.month - 1].capitalize()
     forrige_mnd_navn = MAANEDER[siste_forrige_mnd.month - 1].capitalize()
 
-    # Beregn totaler
     tjent_denne = sum(x["antall"] for x in logg if x.get("aar_mnd") == denne_mnd_key and x.get("type") == "tjent")
     brukt_denne = sum(x["antall"] for x in logg if x.get("aar_mnd") == denne_mnd_key and x.get("type") == "brukt")
 
     tjent_forrige = sum(x["antall"] for x in logg if x.get("aar_mnd") == forrige_mnd_key and x.get("type") == "tjent")
     brukt_forrige = sum(x["antall"] for x in logg if x.get("aar_mnd") == forrige_mnd_key and x.get("type") == "brukt")
 
-    # Sammenligningskort
     diff_tjent = tjent_denne - tjent_forrige
     if tjent_forrige == 0 and tjent_denne > 0:
         trend_tekst = f"🚀 Flott start på {denne_mnd_navn}! Familien har allerede tjent **{tjent_denne} ⭐**!"
@@ -1238,7 +1290,6 @@ with fane_statistikk:
         unsafe_allow_html=True
     )
 
-    # Statistikk fordelt per barn denne måneden
     if stjerne_brukere:
         st.markdown(f"##### 👤 Barnas innsats i {denne_mnd_navn}")
         kols = st.columns(len(stjerne_brukere))
@@ -1261,8 +1312,6 @@ with fane_statistikk:
                 )
 
     st.write("---")
-
-    # Siste hendelser i loggen
     st.markdown("##### 📜 Siste stjerneaktiviteter")
     if logg:
         siste_hendelser = list(reversed(logg))[:15]
@@ -1277,11 +1326,9 @@ with fane_statistikk:
             if h_type == "tjent":
                 symbol = f"+{h_antall} ⭐"
                 farge_txt = "#34D399"
-                badge_t = "TJENT"
             else:
                 symbol = f"-{h_antall} ⭐"
                 farge_txt = "#F87171"
-                badge_t = "BRUKT"
 
             st.markdown(
                 f"""
@@ -1301,7 +1348,7 @@ with fane_statistikk:
     else:
         st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE 4: MIDDAG & FRYSER -----------------
+# ----------------- FANE 4: MIDDAG & FRYSER (MED AUTOMATISK STRYKING) -----------------
 with fane_middag:
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
         fryser_varer = data.get("fryser", [])
@@ -1341,10 +1388,13 @@ with fane_middag:
     oppskrifter = data.get("oppskrifter", STANDARD_MIDDAGER)
     oppskriftsliste = sorted(list(oppskrifter.keys()))
 
-    c_m1, c_m2 = st.columns(2)
-    with c_m1: st.button("✨ Auto-planlegg uken", on_click=cb_auto_planlegg, args=(oppskriftsliste,), use_container_width=True)
+    c_m1, c_m2, c_m3 = st.columns(3)
+    with c_m1:
+        st.button("✨ Auto-planlegg uken", on_click=cb_auto_planlegg, args=(oppskriftsliste,), use_container_width=True)
     with c_m2:
-        if st.button("🛒 Middager til handleliste", use_container_width=True):
+        st.button("🧊 Planlegg fra fryseren", on_click=cb_planlegg_fra_fryser, args=(oppskrifter, data.get("fryser", [])), use_container_width=True)
+    with c_m3:
+        if st.button("🛒 Til handleliste", use_container_width=True):
             lagt = 0
             for d in DAGER:
                 rett = st.session_state.get(f"rett_{d}", "").strip()
@@ -1367,7 +1417,7 @@ with fane_middag:
             if valgt_rett in oppskrifter and oppskrifter[valgt_rett].get("bilde"):
                 st.image(oppskrifter[valgt_rett]["bilde"], use_container_width=True)
             
-            c_r1, c_r2 = st.columns([0.82, 0.18])
+            c_r1, c_r2 = st.columns([0.80, 0.20])
             ny_rett = c_r1.text_input(
                 f"Rett {dag}", 
                 value=valgt_rett, 
@@ -1380,6 +1430,16 @@ with fane_middag:
                 for i_navn in oppskrifter[ny_rett].get("ingredienser", []): legg_til_vare_i_data(i_navn)
                 lagre_naa()
                 st.toast(f"Ingredienser til {ny_rett} lagt til!")
+
+            # KNAPP FOR Å STRYKE FRA FRYSEREN NÅR MIDDAGEN ER SPIST (VISES FOR DAGENS MIDDAG)
+            if er_idag and valgt_rett.strip():
+                if st.button(f"🍽️ Middagen er spist! (Fjern råvare fra fryseren hvis brukt)", key=f"spist_btn_{dag}", use_container_width=True):
+                    slettet, slettet_navn = slett_vare_fra_fryser_ved_navn(valgt_rett)
+                    if slettet:
+                        st.balloons()
+                        st.toast(f"🎉 Vel bekomme! '{slettet_navn}' er nå strøket fra fryseren!")
+                    else:
+                        st.toast(f"Middag registrert som spist! (Ingen matchende vare i fryseren å stryke)")
 
             if ny_rett != data["middagsplan"].get(dag, ""):
                 data["middagsplan"][dag] = ny_rett
