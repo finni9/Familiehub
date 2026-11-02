@@ -613,7 +613,7 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
             unsafe_allow_html=True
         )
 
-   # Generer kalenderuker (0 = Mandag)
+  # Generer kalenderuker (0 = Mandag)
     cal = calendar.Calendar(firstweekday=0)
     uker = cal.monthdayscalendar(vis_aar, vis_mnd)
 
@@ -622,24 +622,28 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
         for dag_idx, dag_nr in enumerate(uke):
             with kolonner_uke[dag_idx]:
                 if dag_nr == 0:
-                    # Tom rute for dager utenfor måneden
-                    st.markdown("<div style='min-height: 60px; background: rgba(0,0,0,0.02); border-radius: 6px; margin-bottom: 4px;'></div>", unsafe_allow_html=True)
+                    # Tom rute utenfor måneden (nøytral lys grå)
+                    st.markdown(
+                        "<div style='min-height: 64px; background-color: #E2E8F0; border-radius: 8px; margin-bottom: 5px; opacity: 0.4;'></div>", 
+                        unsafe_allow_html=True
+                    )
                 else:
                     curr_date = date(vis_aar, vis_mnd, dag_nr)
                     curr_date_str = curr_date.strftime("%Y-%m-%d")
                     er_idag = (curr_date == idag_dato)
                     
                     # Finn hendelser på denne datoen
-                    dagens_hendelser = [m for m in merkedager if m["dato"] == curr_date_str]
+                    dagens_hendelser = [m for m in merkedager if m.get("dato") == curr_date_str]
                     
-                    kant_farge = "#2563EB" if er_idag else "#CBD5E1"
-                    bg_dag = "#EFF6FF" if er_idag else "#FFFFFF"
-                    
-                    # TYDELIG DATO-NUMMER MED FAST MØRK FARGE:
+                    # Låste farger som fungerer 100 % uavhengig av Dark Mode
                     if er_idag:
-                        dag_badge = f"<span style='background-color: #2563EB; color: #FFFFFF; padding: 2px 6px; border-radius: 10px; font-weight: 900; font-size: 0.85rem;'>{dag_nr}</span>"
+                        kant_stil = "2.5px solid #2563EB"
+                        bg_rute = "#DBEAFE"  # Myk lyseblå
+                        dag_html = "<span style='background-color: #2563EB; color: #FFFFFF !important; padding: 2px 7px; border-radius: 8px; font-weight: 900; font-size: 0.9rem;'>I dag</span>"
                     else:
-                        dag_badge = f"<span style='color: #0F172A; font-weight: 800; font-size: 0.9rem;'>{dag_nr}</span>"
+                        kant_stil = "1.5px solid #94A3B8"
+                        bg_rute = "#FFFFFF"  # Fast hvit flate
+                        dag_html = f"<span style='color: #0F172A !important; font-weight: 900; font-size: 0.95rem;'>{dag_nr}</span>"
 
                     hendelser_html = ""
                     for h in dagens_hendelser:
@@ -648,20 +652,20 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
                         h_ikon = h.get("ikon", "📌")
                         h_tittel = h["tittel"]
                         hendelser_html += f"""
-                        <div style="background-color: {prof['bg']}; border-left: 3px solid {prof['kant']}; 
-                                    padding: 2px 4px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; 
-                                    color: #0F172A !important; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" 
+                        <div style="background-color: {prof['bg']} !important; border-left: 3.5px solid {prof['kant']} !important; 
+                                    padding: 2px 4px; border-radius: 4px; font-size: 0.72rem; font-weight: 800; 
+                                    color: #0F172A !important; margin-top: 3px; line-height: 1.2; box-shadow: 0 1px 2px rgba(0,0,0,0.08);" 
                              title="{h_tittel} ({h_hvem})">
-                            {prof['ikon']} {h_ikon} {h_tittel}
+                            {prof['ikon']} {h_ikon} <span style="color: #0F172A !important;">{h_tittel}</span>
                         </div>
                         """
 
                     st.markdown(
                         f"""
-                        <div style="min-height: 62px; background-color: {bg_dag}; border: 1.5px solid {kant_farge}; 
-                                    border-radius: 8px; padding: 4px; margin-bottom: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                            <div style="text-align: right; line-height: 1.1; margin-bottom: 2px;">
-                                {dag_badge}
+                        <div style="min-height: 64px; background-color: {bg_rute} !important; border: {kant_stil} !important; 
+                                    border-radius: 8px; padding: 4px; margin-bottom: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
+                            <div style="text-align: right; line-height: 1; margin-bottom: 3px;">
+                                {dag_html}
                             </div>
                             {hendelser_html}
                         </div>
