@@ -5,6 +5,7 @@ import uuid
 import base64
 import io
 import time
+import calendar
 import pandas as pd
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
@@ -104,6 +105,7 @@ AVDELINGER = [
 ]
 
 DAGER = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"]
+DAGER_KORT = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"]
 MAANEDER = [
     "januar", "februar", "mars", "april", "mai", "juni",
     "juli", "august", "september", "oktober", "november", "desember"
@@ -562,10 +564,108 @@ with col_banner:
     """
     st.markdown(banner_html, unsafe_allow_html=True)
 
-# ----------------- KALENDER -----------------
-with st.expander("🗓️ **Familiens Kalender & Merkedager**", expanded=False):
-    merkedager = data.get("merkedager", [])
+# ----------------- KALENDER MED FULLT MÅNEDSRUTENETT (MAN-SØN) -----------------
+with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded=False):
     medlemmer = data.get("medlemmer", ["Far", "Mor", "Barn 1", "Barn 2"])
+    merkedager = data.get("merkedager", [])
+
+    # Navigering mellom måneder
+    if "vis_aar" not in st.session_state:
+        st.session_state["vis_aar"] = idag_dato.year
+    if "vis_mnd" not in st.session_state:
+        st.session_state["vis_mnd"] = idag_dato.month
+
+    c_prev, c_mnd_tittel, c_next = st.columns([0.2, 0.6, 0.2])
+    with c_prev:
+        if st.button("◀ Forrige", use_container_width=True):
+            if st.session_state["vis_mnd"] == 1:
+                st.session_state["vis_mnd"] = 12
+                st.session_state["vis_aar"] -= 1
+            else:
+                st.session_state["vis_mnd"] -= 1
+            st.rerun()
+
+    vis_aar = st.session_state["vis_aar"]
+    vis_mnd = st.session_state["vis_mnd"]
+    mnd_navn_tekst = f"{MAANEDER[vis_mnd - 1].capitalize()} {vis_aar}"
+    
+    with c_mnd_tittel:
+        st.markdown(
+            f"<h4 style='text-align: center; margin: 4px 0; color: #1E3A8A; font-weight: 900;'>{mnd_navn_tekst}</h4>",
+            unsafe_allow_html=True
+        )
+
+    with c_next:
+        if st.button("Neste ▶", use_container_width=True):
+            if st.session_state["vis_mnd"] == 12:
+                st.session_state["vis_mnd"] = 1
+                st.session_state["vis_aar"] += 1
+            else:
+                st.session_state["vis_mnd"] += 1
+            st.rerun()
+
+    # Ukedag-overskrifter (Mandag til Søndag)
+    rad_dager = st.columns(7)
+    for idx_d, d_navn in enumerate(DAGER_KORT):
+        farge_header = "#EF4444" if idx_d >= 5 else "#1E3A8A"
+        rad_dager[idx_d].markdown(
+            f"<div style='text-align: center; font-weight: 800; font-size: 0.8rem; color: {farge_header}; padding-bottom: 4px;'>{d_navn}</div>",
+            unsafe_allow_html=True
+        )
+
+    # Generer kalenderuker (0 = Mandag)
+    cal = calendar.Calendar(firstweekday=0)
+    uker = cal.monthdayscalendar(vis_aar, vis_mnd)
+
+    for uke in uker:
+        kolonner_uke = st.columns(7)
+        for dag_idx, dag_nr in enumerate(uke):
+            with kolonner_uke[dag_idx]:
+                if dag_nr == 0:
+                    # Dag utenfor denne måneden
+                    st.markdown("<div style='min-height: 52px; background: rgba(0,0,0,0.02); border-radius: 6px; margin-bottom: 4px;'></div>", unsafe_allow_html=True)
+                else:
+                    curr_date = date(vis_aar, vis_mnd, dag_nr)
+                    curr_date_str = curr_date.strftime("%Y-%m-%d")
+                    er_idag = (curr_date == idag_dato)
+                    
+                    # Finn hendelser på denne datoen
+                    dagens_hendelser = [m for m in merkedager if m["dato"] == curr_date_str]
+                    
+                    kant_farge = "#2563EB" if er_idag else "#E2E8F0"
+                    bg_dag = "#EFF6FF" if er_idag else "#FFFFFF"
+                    dag_label = f"<b>{dag_nr}</b>" if not er_idag else f"<b style='color: #2563EB;'>{dag_nr}</b>"
+
+                    hendelser_html = ""
+                    for h in dagens_hendelser:
+                        h_hvem = h.get("hvem", FELLES_VALG)
+                        prof = hent_profil(h_hvem, medlemmer)
+                        h_ikon = h.get("ikon", "📌")
+                        h_tittel = h["tittel"]
+                        hendelser_html += f"""
+                        <div style="background-color: {prof['bg']}; border-left: 3px solid {prof['kant']}; 
+                                    padding: 2px 4px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; 
+                                    color: #0F172A; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" 
+                             title="{h_tittel} ({h_hvem})">
+                            {prof['ikon']} {h_ikon} {h_tittel}
+                        </div>
+                        """
+
+                    st.markdown(
+                        f"""
+                        <div style="min-height: 56px; background-color: {bg_dag}; border: 1.5px solid {kant_farge}; 
+                                    border-radius: 6px; padding: 3px 4px; margin-bottom: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                            <div style="font-size: 0.75rem; text-align: right; line-height: 1;">{dag_label}</div>
+                            {hendelser_html}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+    st.write("---")
+    
+    # Detaljliste med kommende hendelser & sletting
+    st.markdown("##### 📋 Kommende aktiviteter")
     slett_merkedag_id = None
     
     if merkedager:
@@ -574,9 +674,14 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager**", expanded=False):
             m_dato = datetime.strptime(m["dato"], "%Y-%m-%d").date()
             dager_igjen = (m_dato - idag_dato).days
             
-            if dager_igjen == 0: nedtelling = "🎉 I DAG!"
-            elif dager_igjen == 1: nedtelling = "⏰ I morgen!"
-            else: nedtelling = f"⏳ Om {dager_igjen} dager"
+            if dager_igjen < 0:
+                continue  # Skjul passert
+            elif dager_igjen == 0: 
+                nedtelling = "🎉 I DAG!"
+            elif dager_igjen == 1: 
+                nedtelling = "⏰ I morgen!"
+            else: 
+                nedtelling = f"⏳ Om {dager_igjen} dager"
 
             hvem = m.get("hvem", FELLES_VALG)
             prof = hent_profil(hvem, medlemmer)
@@ -591,13 +696,13 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager**", expanded=False):
                         <span style="background-color: {prof['badge']}; color: {prof['navn_farge']}; padding: 1px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700; margin-left: 6px;">
                             {prof['ikon']} {hvem}
                         </span><br>
-                        <span style="font-size: 0.85rem; color: #4B5563;">📅 {m_dato.strftime('%d.%m.%Y')} — <b>{nedtelling}</b></span>
+                        <span style="font-size: 0.85rem; color: #4B5563;">📅 {DAGER[m_dato.weekday()]} {m_dato.strftime('%d.%m.%Y')} — <b>{nedtelling}</b></span>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
             with c_slett:
-                if st.button("✕", key=f"del_m_{m['id']}", help="Fjern"):
+                if st.button("✕", key=f"del_m_{m['id']}", help="Fjern aktivitet"):
                     slett_merkedag_id = m["id"]
 
         if slett_merkedag_id:
@@ -605,22 +710,22 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager**", expanded=False):
             lagre_naa()
             st.rerun()
     else:
-        st.caption("Ingen merkedager lagt inn.")
+        st.caption("Ingen aktiviteter lagt inn.")
 
     st.write("---")
     with st.form("form_ny_merkedag", clear_on_submit=True):
         st.markdown("##### ➕ Legg til aktivitet eller merkedag")
-        m_tittel = st.text_input("Hva skal skje?", placeholder="f.eks. Dans, Fotball, Bursdag")
+        m_tittel = st.text_input("Hva skal skje?", placeholder="f.eks. Dans, Fotballtrening, Bursdag")
         col_h, col_i = st.columns([0.6, 0.4])
         m_hvem = col_h.selectbox("Hvem gjelder det?", medlemmer + [FELLES_VALG])
-        m_ikon = col_i.selectbox("Type:", ["🩰 Dans", "⚽ Sport", "🎂 Bursdag", "🏊 Svømming", "🎒 Skole/SFO", "🦷 Tannlege", "✈️ Ferie", "📌 Annet"])
+        m_ikon = col_i.selectbox("Type:", ["🩰 Dans", "⚽ Sport/Fotball", "🎂 Bursdag", "🏊 Svømming", "🎒 Skole/SFO", "🦷 Tannlege/Lege", "✈️ Ferie/Tur", "📌 Annet"])
         
-        m_dato_valg = st.date_input("Dato:", min_value=idag_dato, value=idag_dato)
+        m_dato_valg = st.date_input("Startdato:", min_value=idag_dato, value=idag_dato)
         col_gjenta, col_uker = st.columns([0.55, 0.45])
         m_gjenta = col_gjenta.checkbox("🔄 Gjenta ukentlig", value=False)
         m_antall_uker = col_uker.number_input("Antall uker:", min_value=2, max_value=40, value=10, disabled=not m_gjenta)
         
-        if st.form_submit_button("Lagre i kalenderen", use_container_width=True) and m_tittel.strip():
+        if st.form_submit_button("Lagre i kalenderen 🗓️", use_container_width=True) and m_tittel.strip():
             antall_ganger = int(m_antall_uker) if m_gjenta else 1
             for uke_nr in range(antall_ganger):
                 ny_dato = m_dato_valg + timedelta(weeks=uke_nr)
@@ -632,7 +737,8 @@ with st.expander("🗓️ **Familiens Kalender & Merkedager**", expanded=False):
                     "hvem": m_hvem
                 })
             lagre_naa()
-            st.toast("Aktivitet lagret!")
+            msg = f"Lagt til {m_tittel} i {antall_ganger} uker fremover!" if m_gjenta else f"Lagt til {m_tittel}!"
+            st.toast(msg)
             st.rerun()
 
 # ----------------- OPPSLAGSTAVLE -----------------
@@ -694,7 +800,7 @@ with fane_oppgaver:
     medlemmer = data.get("medlemmer", [])
     stjerne_brukere = data.get("stjerne_brukere", [])
 
-    # 1. FORELDREGODKJENNING (Vises kun når foreldremodus er ulåst)
+    # 1. FORELDREGODKJENNING
     oppgaver_til_godkjenning = [o for o in data["oppgaver"] if o.get("status") == "venter"]
     
     if er_forelder and oppgaver_til_godkjenning:
@@ -829,7 +935,6 @@ with fane_oppgaver:
                 stjerner = oppg.get("stjerner", 1)
                 ikon = oppg.get("ikon", "✨")
 
-                # STIL FOR KORTET BASERT PÅ STATUS OG PERSONENS FARGE
                 if st_status == "godkjent":
                     bg_kort, kant_kort = "#F1F5F9", "#CBD5E1"
                     tekst_stil = "text-decoration: line-through; opacity: 0.6;"
@@ -837,7 +942,7 @@ with fane_oppgaver:
                 elif st_status == "venter":
                     bg_kort, kant_kort = "#FEF3C7", "#F59E0B"
                     tekst_stil = "font-weight: 700; color: #92400E;"
-                    status_badge = "⏳ Venter på at mor/far godkjenner..."
+                    status_badge = "⏳ Venter på godkjenning..."
                 else:
                     bg_kort, kant_kort = prof["bg"], prof["kant"]
                     tekst_stil = f"font-weight: 800; color: #0F172A;"
@@ -933,7 +1038,7 @@ with fane_oppgaver:
         lagre_naa()
         st.rerun()
 
-    # 5. FORELDRE: LEGG TIL NY OPPGAVE MED IKONVELGER
+    # 5. FORELDRE: LEGG TIL NY OPPGAVE
     if er_forelder:
         st.write("---")
         with st.expander("➕ **Legg til ny oppgave (for voksne)**"):
@@ -959,7 +1064,7 @@ with fane_oppgaver:
                             "gjentakende": er_daglig
                         })
                     lagre_naa()
-                    st.toast("Oppgave lagret med farge og ikon!")
+                    st.toast("Oppgave lagret!")
                     st.rerun()
 
 # ----------------- FANE 2: BUTIKK & SPAREMÅL -----------------
