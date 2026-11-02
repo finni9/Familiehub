@@ -230,50 +230,72 @@ def standard_data(valgt_pin="1234"):
     }
 
 # ----------------- MULTI-FAMILIE GOOGLE SHEETS -----------------
+import time
+
+# ----------------- STABIL MULTI-FAMILIE GOOGLE SHEETS -----------------
 def hent_hele_tabellen():
-    try:
-        df = conn.read(ttl=0)
-        if df.empty:
-            return pd.DataFrame(columns=["familie_kode", "data_dump"])
-        if "familie_kode" not in df.columns:
-            df["familie_kode"] = "hoved"
-            if "data_dump" not in df.columns:
-                df["data_dump"] = "{}"
-        return df[["familie_kode", "data_dump"]].dropna(subset=["familie_kode"])
-    except Exception:
-        return pd.DataFrame(columns=["familie_kode", "data_dump"])
+    for forsok in range(3):
+        try:
+            df = conn.read(ttl=2)  # 2 sekunders cache sparer unødige API-kall
+            if df is None or df.empty:
+                return pd.DataFrame(columns=["familie_kode", "data_dump"])
+            if "familie_kode" not in df.columns:
+                df["familie_kode"] = "hoved"
+                if "data_dump" not in df.columns:
+                    df["data_dump"] = "{}"
+            return df[["familie_kode", "data_dump"]].dropna(subset=["familie_kode"])
+        except Exception as e:
+            if forsok < 2:
+                time.sleep(0.5 * (forsok + 1))
+            else:
+                st.warning("⚠️ Litt treg kontakt med skylagringen, prøver igjen...")
+                return pd.DataFrame(columns=["familie_kode", "data_dump"])
 
 def hent_familie_json(familie_navn):
+    # Hvis vi allerede har ferske data i minnet for denne økten, bruk dem
+    if "familie_data" in st.session_state and st.session_state.get("aktiv_familie") == str(familie_navn).lower():
+        return st.session_state["familie_data"]
+
     df = hent_hele_tabellen()
     rad = df[df["familie_kode"].astype(str).str.lower() == str(familie_navn).lower()]
     if not rad.empty:
         try:
-            return json.loads(str(rad["data_dump"].iloc[0]))
+            parsed = json.loads(str(rad["data_dump"].iloc[0]))
+            st.session_state["familie_data"] = parsed
+            return parsed
         except Exception:
             return None
     return None
 
 def lagre_familie_data(familie_navn, ny_data):
-    try:
-        df = hent_hele_tabellen()
-        json_tekst = json.dumps(ny_data, ensure_ascii=False)
-        
-        if len(json_tekst) > 48000:
-            st.error("⚠️ Datamengden er for stor for regnearket. Endringen ble ikke lagret.")
-            return False
-        
-        mask = df["familie_kode"].astype(str).str.lower() == str(familie_navn).lower()
-        if mask.any():
-            df.loc[mask, "data_dump"] = json_tekst
-        else:
-            ny_rad = pd.DataFrame([{"familie_kode": str(familie_navn).strip().lower(), "data_dump": json_tekst}])
-            df = pd.concat([df, ny_rad], ignore_index=True)
+    # 1. Oppdater alltid lokal minnetilstand umiddelbart
+    st.session_state["familie_data"] = ny_data
+    
+    # 2. Prøv å synkronisere til Google Sheets med retry
+    for forsok in range(3):
+        try:
+            df = hent_hele_tabellen()
+            json_tekst = json.dumps(ny_data, ensure_ascii=False)
             
-        conn.update(data=df)
-        return True
-    except Exception as e:
-        st.error(f"Kunne ikke lagre til Google Sheets: {e}")
-        return False
+            if len(json_tekst) > 48000:
+                st.error("⚠️ Datamengden er for stor for regnearket. Endringen ble ikke lagret.")
+                return False
+            
+            mask = df["familie_kode"].astype(str).str.lower() == str(familie_navn).lower()
+            if mask.any():
+                df.loc[mask, "data_dump"] = json_tekst
+            else:
+                ny_rad = pd.DataFrame([{"familie_kode": str(familie_navn).strip().lower(), "data_dump": json_tekst}])
+                df = pd.concat([df, ny_rad], ignore_index=True)
+                
+            conn.update(data=df)
+            return True
+        except Exception as e:
+            if forsok < 2:
+                time.sleep(0.6 * (forsok + 1))  # Vent litt før neste forsøk
+            else:
+                st.toast("⚠️ Kunne ikke lagre til skyen akkurat nå. Dataene beholdes lokalt på skjermen!")
+                return False
 
 def endre_familie_navn(gammelt_navn, nytt_navn):
     try:
@@ -366,10 +388,8 @@ aktiv_kode = st.session_state["aktiv_familie"]
 raw_data = hent_familie_json(aktiv_kode)
 
 if not raw_data:
-    st.error("Kunne ikke hente familiedata. Vennligst logg inn på nytt.")
-    st.session_state["aktiv_familie"] = ""
-    st.query_params.clear()
-    st.stop()
+    st.warning("Kobler til familiens skyhub...")
+    st.stop()  # Stopper skriptet midlertidig i stedet for å slette aktiv_familie og kaste deg ut!
 
 if "merkedager" not in raw_data: raw_data["merkedager"] = []
 if "oppskrifter" not in raw_data: raw_data["oppskrifter"] = STANDARD_MIDDAGER
