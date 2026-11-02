@@ -1348,7 +1348,7 @@ with fane_statistikk:
     else:
         st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE 4: MIDDAG & FRYSER (MED AUTOMATISK STRYKING) -----------------
+# ----------------- FANE 4: MIDDAG & FRYSER (KOMPAKT RUTENETT) -----------------
 with fane_middag:
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
         fryser_varer = data.get("fryser", [])
@@ -1405,49 +1405,69 @@ with fane_middag:
             st.toast(f"{lagt} ingredienser lagt i handlelisten! 🛒")
 
     st.write("---")
+    
+    # KOMPAKT RUTENETT FOR DAGENE (2 OG 2 SAMMEN)
+    st.markdown("#### 📅 Ukens Middagsplan")
+    
+    dag_rader = [
+        ["Mandag", "Tirsdag"],
+        ["Onsdag", "Torsdag"],
+        ["Fredag", "Lørdag"],
+        ["Søndag"]
+    ]
+    
     plan_oppdatert = False
 
-    for dag in DAGER:
-        er_idag = (dag == idag_navn)
-        valgt_rett = st.session_state.get(f"rett_{dag}", "")
-        tittel_dag = f"👉 **{dag} (I dag)**" if er_idag else f"📅 **{dag}**"
-        
-        with st.container():
-            st.markdown(f"#### {tittel_dag}")
-            if valgt_rett in oppskrifter and oppskrifter[valgt_rett].get("bilde"):
-                st.image(oppskrifter[valgt_rett]["bilde"], use_container_width=True)
-            
-            c_r1, c_r2 = st.columns([0.80, 0.20])
-            ny_rett = c_r1.text_input(
-                f"Rett {dag}", 
-                value=valgt_rett, 
-                key=f"rett_{dag}", 
-                placeholder="Hva skal dere spise?", 
-                label_visibility="collapsed"
-            )
-            
-            if ny_rett in oppskrifter and c_r2.button("🛒", key=f"kjop_dag_{dag}", help=f"Kjøp til {ny_rett}"):
-                for i_navn in oppskrifter[ny_rett].get("ingredienser", []): legg_til_vare_i_data(i_navn)
-                lagre_naa()
-                st.toast(f"Ingredienser til {ny_rett} lagt til!")
+    for rad in dag_rader:
+        kols = st.columns(len(rad))
+        for idx, dag in enumerate(rad):
+            with kols[idx]:
+                er_idag = (dag == idag_navn)
+                valgt_rett = st.session_state.get(f"rett_{dag}", "")
+                
+                kant_farge = "#3B82F6" if er_idag else "#334155"
+                bg_farge = "#1E293B" if er_idag else "#0F172A"
+                badge_idag = " <span style='background-color: #3B82F6; color: #FFFFFF; font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; font-weight: 800;'>I DAG</span>" if er_idag else ""
 
-            # KNAPP FOR Å STRYKE FRA FRYSEREN NÅR MIDDAGEN ER SPIST (VISES FOR DAGENS MIDDAG)
-            if er_idag and valgt_rett.strip():
-                if st.button(f"🍽️ Middagen er spist! (Fjern råvare fra fryseren hvis brukt)", key=f"spist_btn_{dag}", use_container_width=True):
-                    slettet, slettet_navn = slett_vare_fra_fryser_ved_navn(valgt_rett)
-                    if slettet:
-                        st.balloons()
-                        st.toast(f"🎉 Vel bekomme! '{slettet_navn}' er nå strøket fra fryseren!")
-                    else:
-                        st.toast(f"Middag registrert som spist! (Ingen matchende vare i fryseren å stryke)")
+                st.markdown(
+                    f"""
+                    <div style="background-color: {bg_farge}; border: 1.5px solid {kant_farge}; border-radius: 10px; padding: 8px 10px 4px 10px; margin-bottom: 6px;">
+                        <span style="font-weight: 800; font-size: 0.95rem; color: #FFFFFF;">{dag}{badge_idag}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
-            if ny_rett != data["middagsplan"].get(dag, ""):
-                data["middagsplan"][dag] = ny_rett
-                plan_oppdatert = True
-            
-            st.divider()
+                c_inn, c_kjop = st.columns([0.78, 0.22])
+                ny_rett = c_inn.text_input(
+                    f"Rett {dag}", 
+                    value=valgt_rett, 
+                    key=f"rett_{dag}", 
+                    placeholder="Middag...", 
+                    label_visibility="collapsed"
+                )
+                
+                if ny_rett in oppskrifter and c_kjop.button("🛒", key=f"kjop_dag_{dag}", help=f"Kjøp til {ny_rett}"):
+                    for i_navn in oppskrifter[ny_rett].get("ingredienser", []):
+                        legg_til_vare_i_data(i_navn)
+                    lagre_naa()
+                    st.toast(f"Ingredienser til {ny_rett} lagt til!")
 
-    if plan_oppdatert: lagre_naa()
+                if er_idag and valgt_rett.strip():
+                    if st.button("🍽️ Spist (stryk råvare)", key=f"spist_btn_{dag}", use_container_width=True):
+                        slettet, slettet_navn = slett_vare_fra_fryser_ved_navn(valgt_rett)
+                        if slettet:
+                            st.balloons()
+                            st.toast(f"🎉 '{slettet_navn}' er nå strøket fra fryseren!")
+                        else:
+                            st.toast("Middag registrert som spist!")
+
+                if ny_rett != data["middagsplan"].get(dag, ""):
+                    data["middagsplan"][dag] = ny_rett
+                    plan_oppdatert = True
+
+    if plan_oppdatert: 
+        lagre_naa()
 
     with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
