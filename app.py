@@ -112,18 +112,19 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
+# ----------------- TETTE, TYDELIGE FARGEPROFILER -----------------
 PERSON_PROFILER = [
-    {"navn_farge": "#1D4ED8", "bg": "#EFF6FF", "kant": "#3B82F6", "badge": "#DBEAFE", "ikon": "🦁"},
-    {"navn_farge": "#BE185D", "bg": "#FDF2F8", "kant": "#EC4899", "badge": "#FCE7F3", "ikon": "🐰"},
-    {"navn_farge": "#B45309", "bg": "#FEF3C7", "kant": "#F59E0B", "badge": "#FDE68A", "ikon": "🐻"},
-    {"navn_farge": "#047857", "bg": "#ECFDF5", "kant": "#10B981", "badge": "#D1FAE5", "ikon": "🦊"},
-    {"navn_farge": "#6D28D9", "bg": "#F5F3FF", "kant": "#8B5CF6", "badge": "#EDE9FE", "ikon": "🐼"},
-    {"navn_farge": "#C2410C", "bg": "#FFF7ED", "kant": "#F97316", "badge": "#FFEDD5", "ikon": "🐯"},
+    {"navn_farge": "#1D4ED8", "bg": "#DBEAFE", "kant": "#2563EB", "badge": "#BFDBFE", "ikon": "🦁"},  # Blå Løve
+    {"navn_farge": "#BE185D", "bg": "#FCE7F3", "kant": "#DB2777", "badge": "#FBCFE8", "ikon": "🐰"},  # Rosa Kanin
+    {"navn_farge": "#B45309", "bg": "#FEF3C7", "kant": "#D97706", "badge": "#FDE68A", "ikon": "🐻"},  # Gul/Brun Bjørn
+    {"navn_farge": "#047857", "bg": "#D1FAE5", "kant": "#059669", "badge": "#A7F3D0", "ikon": "🦊"},  # Grønn Rev
+    {"navn_farge": "#6D28D9", "bg": "#EDE9FE", "kant": "#7C3AED", "badge": "#DDD6FE", "ikon": "🐼"},  # Lilla Panda
+    {"navn_farge": "#C2410C", "bg": "#FFEDD5", "kant": "#EA580C", "badge": "#FED7AA", "ikon": "🐯"},  # Oransje Tiger
 ]
 
 def hent_profil(person, alle_medlemmer):
     if person == FELLES_VALG or person == "Felles":
-        return {"navn_farge": "#334155", "bg": "#F8FAFC", "kant": "#64748B", "badge": "#E2E8F0", "ikon": "🤝"}
+        return {"navn_farge": "#334155", "bg": "#E2E8F0", "kant": "#475569", "badge": "#CBD5E1", "ikon": "🤝"}
     if person in alle_medlemmer:
         idx = alle_medlemmer.index(person) % len(PERSON_PROFILER)
         return PERSON_PROFILER[idx]
@@ -788,7 +789,7 @@ faner = st.tabs(fane_navn)
 fane_oppgaver, fane_butikk, fane_middag, fane_handleliste, fane_aktiviteter = faner[0], faner[1], faner[2], faner[3], faner[4]
 fane_familie = faner[5] if er_forelder else None
 
-# ----------------- FANE 1: OPPGAVER & GODKJENNING (MED LÅST MØRK TEKST) -----------------
+# ----------------- FANE 1: OPPGAVER & GODKJENNING (TYDELIGE FARGER) -----------------
 with fane_oppgaver:
     oppgaver_oppdatert = False
     slett_id = None
@@ -906,7 +907,7 @@ with fane_oppgaver:
 
     st.write("")
 
-    # 3. OPPGAVER MED SKARPT LÅST SORT TEKST VED FULLFØRT/VENTER
+    # 3. OPPGAVER MED BEHOLDTE FARGER FOR BARNA
     for person in medlemmer:
         prof = hent_profil(person, medlemmer)
         person_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == person]
@@ -929,22 +930,19 @@ with fane_oppgaver:
                 stjerner = oppg.get("stjerner", 1)
                 ikon = oppg.get("ikon", "✨")
 
-                # LÅST STIL UTEN KORRUPT HVIT TEKST:
+                # FARGENE TIL HVERT BARN BEHOLDES ALLTID:
+                bg_kort = prof["bg"]
+                kant_kort = prof["kant"]
+
                 if st_status == "godkjent":
-                    bg_kort = "#E2E8F0"
-                    kant_kort = "#64748B"
                     tekst_farge = "#334155 !important;"
-                    tekst_dekor = "text-decoration: line-through;"
-                    status_badge = "<span style='color: #047857 !important; font-weight: 800;'>✅ Godkjent (+ stjerner gitt!)</span>"
+                    tekst_dekor = "text-decoration: line-through; opacity: 0.7;"
+                    status_badge = "<span style='color: #047857 !important; font-weight: 800;'>✅ Godkjent</span>"
                 elif st_status == "venter":
-                    bg_kort = "#FEF3C7"
-                    kant_kort = "#F59E0B"
                     tekst_farge = "#78350F !important;"
                     tekst_dekor = "font-weight: 800;"
-                    status_badge = "<span style='color: #B45309 !important; font-weight: 800;'>⏳ Venter på godkjenning...</span>"
+                    status_badge = "<span style='color: #B45309 !important; font-weight: 800;'>⏳ Venter på sjekk</span>"
                 else:
-                    bg_kort = prof["bg"]
-                    kant_kort = prof["kant"]
                     tekst_farge = "#0F172A !important;"
                     tekst_dekor = "font-weight: 800;"
                     status_badge = f"<span style='color: #0F172A !important; font-weight: 800;'>+{stjerner} ⭐</span>"
@@ -952,12 +950,13 @@ with fane_oppgaver:
                 st.markdown(
                     f"""
                     <div style="background-color: {bg_kort} !important; border-left: 6px solid {kant_kort} !important; 
+                                border: 1.5px solid {kant_kort} !important; border-left-width: 6px !important;
                                 border-radius: 10px; padding: 10px 14px; margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-size: 1.15rem; color: {tekst_farge} {tekst_dekor}">
                                 <span style="font-size: 1.35rem; margin-right: 6px;">{ikon}</span> {oppg['tekst']}
                             </span>
-                            <span style="background: rgba(255,255,255,0.85) !important; border: 1.5px solid rgba(0,0,0,0.12) !important; 
+                            <span style="background: rgba(255,255,255,0.9) !important; border: 1.5px solid rgba(0,0,0,0.15) !important; 
                                          padding: 3px 8px; border-radius: 10px; font-size: 0.75rem;">
                                 {status_badge}
                             </span>
@@ -997,21 +996,19 @@ with fane_oppgaver:
                 ikon = oppg.get("ikon", "🤝")
 
                 if st_status == "godkjent":
-                    bg_kort, kant_kort = "#E2E8F0", "#64748B"
                     t_farge = "#334155 !important;"
-                    t_dekor = "text-decoration: line-through;"
+                    t_dekor = "text-decoration: line-through; opacity: 0.7;"
                 elif st_status == "venter":
-                    bg_kort, kant_kort = "#FEF3C7", "#F59E0B"
                     t_farge = "#78350F !important;"
                     t_dekor = "font-weight: 800;"
                 else:
-                    bg_kort, kant_kort = prof_felles["bg"], prof_felles["kant"]
                     t_farge = "#0F172A !important;"
                     t_dekor = "font-weight: 800;"
 
                 st.markdown(
                     f"""
-                    <div style="background-color: {bg_kort} !important; border-left: 6px solid {kant_kort} !important; 
+                    <div style="background-color: {prof_felles['bg']} !important; border-left: 6px solid {prof_felles['kant']} !important; 
+                                border: 1.5px solid {prof_felles['kant']} !important; border-left-width: 6px !important;
                                 border-radius: 10px; padding: 10px 14px; margin-bottom: 6px;">
                         <span style="font-size: 1.15rem; color: {t_farge} {t_dekor}">
                             <span style="font-size: 1.35rem; margin-right: 6px;">{ikon}</span> {oppg['tekst']}
