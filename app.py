@@ -112,14 +112,13 @@ MAANEDER = [
 ]
 FELLES_VALG = "Felles (Mor & Far / Den som gjør det)"
 
-# ----------------- FARGE- OG IKONPROFILER PER FAMILIEMEDLEM -----------------
 PERSON_PROFILER = [
-    {"navn_farge": "#1D4ED8", "bg": "#EFF6FF", "kant": "#3B82F6", "badge": "#DBEAFE", "ikon": "🦁"},  # Blå Løve
-    {"navn_farge": "#BE185D", "bg": "#FDF2F8", "kant": "#EC4899", "badge": "#FCE7F3", "ikon": "🐰"},  # Rosa Kanin
-    {"navn_farge": "#B45309", "bg": "#FEF3C7", "kant": "#F59E0B", "badge": "#FDE68A", "ikon": "🐻"},  # Gul/Brun Bjørn
-    {"navn_farge": "#047857", "bg": "#ECFDF5", "kant": "#10B981", "badge": "#D1FAE5", "ikon": "🦊"},  # Grønn Rev
-    {"navn_farge": "#6D28D9", "bg": "#F5F3FF", "kant": "#8B5CF6", "badge": "#EDE9FE", "ikon": "🐼"},  # Lilla Panda
-    {"navn_farge": "#C2410C", "bg": "#FFF7ED", "kant": "#F97316", "badge": "#FFEDD5", "ikon": "🐯"},  # Oransje Tiger
+    {"navn_farge": "#1D4ED8", "bg": "#EFF6FF", "kant": "#3B82F6", "badge": "#DBEAFE", "ikon": "🦁"},
+    {"navn_farge": "#BE185D", "bg": "#FDF2F8", "kant": "#EC4899", "badge": "#FCE7F3", "ikon": "🐰"},
+    {"navn_farge": "#B45309", "bg": "#FEF3C7", "kant": "#F59E0B", "badge": "#FDE68A", "ikon": "🐻"},
+    {"navn_farge": "#047857", "bg": "#ECFDF5", "kant": "#10B981", "badge": "#D1FAE5", "ikon": "🦊"},
+    {"navn_farge": "#6D28D9", "bg": "#F5F3FF", "kant": "#8B5CF6", "badge": "#EDE9FE", "ikon": "🐼"},
+    {"navn_farge": "#C2410C", "bg": "#FFF7ED", "kant": "#F97316", "badge": "#FFEDD5", "ikon": "🐯"},
 ]
 
 def hent_profil(person, alle_medlemmer):
@@ -263,7 +262,6 @@ def standard_data(valgt_pin="1234"):
         "handleliste": migrer_handleliste(["Melk", "Brød", "Smør"])
     }
 
-# ----------------- STABIL MULTI-FAMILIE GOOGLE SHEETS -----------------
 def hent_hele_tabellen():
     for forsok in range(3):
         try:
@@ -298,7 +296,6 @@ def hent_familie_json(familie_navn):
 
 def lagre_familie_data(familie_navn, ny_data):
     st.session_state["familie_data"] = ny_data
-    
     for forsok in range(3):
         try:
             df = hent_hele_tabellen()
@@ -357,8 +354,8 @@ if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_famili
     st.markdown(
         """
         <div style="background-color: #EFF6FF; border-radius: 16px; padding: 26px; text-align: center; border: 2px solid #BFDBFE; margin-top: 20px;">
-            <h1 style="color: #1E3A8A; margin: 0; font-size: 1.9rem; font-weight: 900;">🏡 Familiehub</h1>
-            <p style="color: #3B82F6; font-size: 1.05rem; margin-top: 6px; font-weight: 600;">Logg inn i familiens hjem med navn og PIN-kode</p>
+            <h1 style="color: #1E3A8A !important; margin: 0; font-size: 1.9rem; font-weight: 900;">🏡 Familiehub</h1>
+            <p style="color: #3B82F6 !important; font-size: 1.05rem; margin-top: 6px; font-weight: 600;">Logg inn i familiens hjem med navn og PIN-kode</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -551,13 +548,13 @@ with col_banner:
                 box-shadow: 0 4px 15px rgba(255, 107, 107, 0.25);">
         <div style="display: inline-block; background: rgba(255, 255, 255, 0.28); 
                     padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 800; 
-                    color: #FFFFFF; text-transform: uppercase; margin-bottom: 4px;">
+                    color: #FFFFFF !important; text-transform: uppercase; margin-bottom: 4px;">
             ✨ Familiens Hjem
         </div>
-        <h3 style="margin: 0; color: #FFFFFF; font-size: 1.4rem; font-weight: 900; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.15);">
-            🏡 Familiehub <span style="font-weight: 400; opacity: 0.95;">({aktiv_kode.capitalize()})</span>
+        <h3 style="margin: 0; color: #FFFFFF !important; font-size: 1.4rem; font-weight: 900; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+            🏡 Familiehub <span style="font-weight: 400; opacity: 0.95; color: #FFFFFF !important;">({aktiv_kode.capitalize()})</span>
         </h3>
-        <div style="font-size: 0.85rem; font-weight: 600; color: #FFF3E0; margin-top: 2px;">
+        <div style="font-size: 0.85rem; font-weight: 600; color: #FFF3E0 !important; margin-top: 2px;">
             📅 {dato_tekst} &nbsp;•&nbsp; ⏰ {klokke_tekst}
         </div>
     </div>
@@ -569,7 +566,6 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
     medlemmer = data.get("medlemmer", ["Far", "Mor", "Barn 1", "Barn 2"])
     merkedager = data.get("merkedager", [])
 
-    # Navigering mellom måneder
     if "vis_aar" not in st.session_state:
         st.session_state["vis_aar"] = idag_dato.year
     if "vis_mnd" not in st.session_state:
@@ -591,7 +587,7 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
     
     with c_mnd_tittel:
         st.markdown(
-            f"<h4 style='text-align: center; margin: 4px 0; color: #1E3A8A; font-weight: 900;'>{mnd_navn_tekst}</h4>",
+            f"<h4 style='text-align: center; margin: 4px 0; color: #1E3A8A !important; font-weight: 900;'>{mnd_navn_tekst}</h4>",
             unsafe_allow_html=True
         )
 
@@ -604,16 +600,14 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
                 st.session_state["vis_mnd"] += 1
             st.rerun()
 
-    # Ukedag-overskrifter (Mandag til Søndag)
     rad_dager = st.columns(7)
     for idx_d, d_navn in enumerate(DAGER_KORT):
         farge_header = "#EF4444" if idx_d >= 5 else "#1E3A8A"
         rad_dager[idx_d].markdown(
-            f"<div style='text-align: center; font-weight: 800; font-size: 0.8rem; color: {farge_header}; padding-bottom: 4px;'>{d_navn}</div>",
+            f"<div style='text-align: center; font-weight: 800; font-size: 0.8rem; color: {farge_header} !important; padding-bottom: 4px;'>{d_navn}</div>",
             unsafe_allow_html=True
         )
 
-  # Generer kalenderuker (0 = Mandag)
     cal = calendar.Calendar(firstweekday=0)
     uker = cal.monthdayscalendar(vis_aar, vis_mnd)
 
@@ -622,27 +616,21 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
         for dag_idx, dag_nr in enumerate(uke):
             with kolonner_uke[dag_idx]:
                 if dag_nr == 0:
-                    # Tom rute utenfor måneden (nøytral lys grå)
-                    st.markdown(
-                        "<div style='min-height: 64px; background-color: #E2E8F0; border-radius: 8px; margin-bottom: 5px; opacity: 0.4;'></div>", 
-                        unsafe_allow_html=True
-                    )
+                    st.markdown("<div style='min-height: 64px; background-color: #E2E8F0; border-radius: 8px; margin-bottom: 5px; opacity: 0.4;'></div>", unsafe_allow_html=True)
                 else:
                     curr_date = date(vis_aar, vis_mnd, dag_nr)
                     curr_date_str = curr_date.strftime("%Y-%m-%d")
                     er_idag = (curr_date == idag_dato)
                     
-                    # Finn hendelser på denne datoen
                     dagens_hendelser = [m for m in merkedager if m.get("dato") == curr_date_str]
                     
-                    # Låste farger som fungerer 100 % uavhengig av Dark Mode
                     if er_idag:
                         kant_stil = "2.5px solid #2563EB"
-                        bg_rute = "#DBEAFE"  # Myk lyseblå
+                        bg_rute = "#DBEAFE"
                         dag_html = "<span style='background-color: #2563EB; color: #FFFFFF !important; padding: 2px 7px; border-radius: 8px; font-weight: 900; font-size: 0.9rem;'>I dag</span>"
                     else:
                         kant_stil = "1.5px solid #94A3B8"
-                        bg_rute = "#FFFFFF"  # Fast hvit flate
+                        bg_rute = "#FFFFFF"
                         dag_html = f"<span style='color: #0F172A !important; font-weight: 900; font-size: 0.95rem;'>{dag_nr}</span>"
 
                     hendelser_html = ""
@@ -675,7 +663,6 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
 
     st.write("---")
     
-    # Detaljliste med kommende hendelser & sletting
     st.markdown("##### 📋 Kommende aktiviteter")
     slett_merkedag_id = None
     
@@ -686,13 +673,10 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
             dager_igjen = (m_dato - idag_dato).days
             
             if dager_igjen < 0:
-                continue  # Skjul passert
-            elif dager_igjen == 0: 
-                nedtelling = "🎉 I DAG!"
-            elif dager_igjen == 1: 
-                nedtelling = "⏰ I morgen!"
-            else: 
-                nedtelling = f"⏳ Om {dager_igjen} dager"
+                continue
+            elif dager_igjen == 0: nedtelling = "🎉 I DAG!"
+            elif dager_igjen == 1: nedtelling = "⏰ I morgen!"
+            else: nedtelling = f"⏳ Om {dager_igjen} dager"
 
             hvem = m.get("hvem", FELLES_VALG)
             prof = hent_profil(hvem, medlemmer)
@@ -701,13 +685,13 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
             with c_info:
                 st.markdown(
                     f"""
-                    <div style="background-color: {prof['bg']}; border-left: 5px solid {prof['kant']}; 
+                    <div style="background-color: {prof['bg']} !important; border-left: 5px solid {prof['kant']} !important; 
                                 padding: 8px 12px; border-radius: 8px; margin-bottom: 6px;">
-                        <span style="font-size: 1.05rem; font-weight: 800; color: #1F2937;">{m.get('ikon', '📌')} {m['tittel']}</span>
-                        <span style="background-color: {prof['badge']}; color: {prof['navn_farge']}; padding: 1px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700; margin-left: 6px;">
+                        <span style="font-size: 1.05rem; font-weight: 800; color: #0F172A !important;">{m.get('ikon', '📌')} {m['tittel']}</span>
+                        <span style="background-color: {prof['badge']} !important; color: {prof['navn_farge']} !important; padding: 1px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700; margin-left: 6px;">
                             {prof['ikon']} {hvem}
                         </span><br>
-                        <span style="font-size: 0.85rem; color: #4B5563;">📅 {DAGER[m_dato.weekday()]} {m_dato.strftime('%d.%m.%Y')} — <b>{nedtelling}</b></span>
+                        <span style="font-size: 0.85rem; color: #334155 !important;">📅 {DAGER[m_dato.weekday()]} {m_dato.strftime('%d.%m.%Y')} — <b style="color: #0F172A !important;">{nedtelling}</b></span>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -762,9 +746,9 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
             with c_lapp:
                 st.markdown(
                     f"""
-                    <div style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 8px 12px; border-radius: 6px; margin-bottom: 6px;">
-                        <span style="font-size: 0.95rem; font-weight: 600; color: #92400E;">{b['tekst']}</span><br>
-                        <span style="font-size: 0.75rem; color: #B45309;">— {b.get('fra', 'Familien')} ({b.get('tid', '')})</span>
+                    <div style="background-color: #FEF3C7 !important; border-left: 4px solid #F59E0B !important; padding: 8px 12px; border-radius: 6px; margin-bottom: 6px;">
+                        <span style="font-size: 0.95rem; font-weight: 700; color: #78350F !important;">{b['tekst']}</span><br>
+                        <span style="font-size: 0.75rem; color: #92400E !important;">— {b.get('fra', 'Familien')} ({b.get('tid', '')})</span>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -804,7 +788,7 @@ faner = st.tabs(fane_navn)
 fane_oppgaver, fane_butikk, fane_middag, fane_handleliste, fane_aktiviteter = faner[0], faner[1], faner[2], faner[3], faner[4]
 fane_familie = faner[5] if er_forelder else None
 
-# ----------------- FANE 1: OPPGAVER & GODKJENNING -----------------
+# ----------------- FANE 1: OPPGAVER & GODKJENNING (MED LÅST MØRK TEKST) -----------------
 with fane_oppgaver:
     oppgaver_oppdatert = False
     slett_id = None
@@ -817,9 +801,9 @@ with fane_oppgaver:
     if er_forelder and oppgaver_til_godkjenning:
         st.markdown(
             f"""
-            <div style="background: #FEF3C7; border: 2px solid #F59E0B; border-radius: 12px; padding: 12px; margin-bottom: 14px;">
-                <h4 style="margin: 0; color: #92400E;">🔔 {len(oppgaver_til_godkjenning)} oppgave(r) venter på foreldregodkjenning!</h4>
-                <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #B45309;">Sjekk jobben og trykk «Godkjenn» for å gi stjerner.</p>
+            <div style="background: #FEF3C7 !important; border: 2px solid #F59E0B !important; border-radius: 12px; padding: 12px; margin-bottom: 14px;">
+                <h4 style="margin: 0; color: #78350F !important; font-weight: 900;">🔔 {len(oppgaver_til_godkjenning)} oppgave(r) venter på foreldregodkjenning!</h4>
+                <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #92400E !important; font-weight: 600;">Sjekk jobben og trykk «Godkjenn» for å gi stjerner.</p>
             </div>
             """,
             unsafe_allow_html=True
@@ -835,11 +819,11 @@ with fane_oppgaver:
             with col_v_tekst:
                 st.markdown(
                     f"""
-                    <div style="font-weight: 800; font-size: 1rem; color: #0F172A;">
+                    <div style="font-weight: 800; font-size: 1rem; color: #0F172A !important;">
                         {v_oppg.get('ikon', '✨')} {v_oppg['tekst']}
                     </div>
-                    <div style="font-size: 0.8rem; color: #475569;">
-                        Utført av: <b style="color: {prof['navn_farge']};">{prof['ikon']} {hvem}</b> (+{stjerner} ⭐)
+                    <div style="font-size: 0.8rem; color: #334155 !important;">
+                        Utført av: <b style="color: {prof['navn_farge']} !important;">{prof['ikon']} {hvem}</b> (+{stjerner} ⭐)
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -873,7 +857,7 @@ with fane_oppgaver:
                     st.rerun()
             st.divider()
 
-    # 2. STJERNETAVLE MED BARNAS FARGEPROFILER
+    # 2. STJERNETAVLE
     if stjerne_brukere:
         st.markdown("#### 🌟 Familiens Stjernetavle")
         kolonner = st.columns(len(stjerne_brukere))
@@ -885,15 +869,15 @@ with fane_oppgaver:
             with kolonner[idx]:
                 synlige = min(antall_stjerner, 8)
                 stjerne_symboler = "⭐" * synlige if synlige > 0 else "<span style='opacity: 0.3;'>☆☆☆☆</span>"
-                pluss_tekst = f" <span style='font-size: 0.8rem; font-weight: 800;'>(+{antall_stjerner - 8})</span>" if antall_stjerner > 8 else ""
+                pluss_tekst = f" <span style='font-size: 0.8rem; font-weight: 800; color: #0F172A !important;'>(+{antall_stjerner - 8})</span>" if antall_stjerner > 8 else ""
 
                 st.markdown(
                     f"""
-                    <div style="background: {prof['bg']}; border: 3px solid {prof['kant']}; border-radius: 14px; 
+                    <div style="background: {prof['bg']} !important; border: 3px solid {prof['kant']} !important; border-radius: 14px; 
                                 padding: 12px; text-align: center; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
                         <div style="font-size: 2rem; margin-bottom: -4px;">{prof['ikon']}</div>
-                        <div style="font-size: 1.1rem; font-weight: 900; color: {prof['navn_farge']};">{person}</div>
-                        <div style="font-size: 1.8rem; font-weight: 900; color: #0F172A; margin: 2px 0;">
+                        <div style="font-size: 1.1rem; font-weight: 900; color: {prof['navn_farge']} !important;">{person}</div>
+                        <div style="font-size: 1.8rem; font-weight: 900; color: #0F172A !important; margin: 2px 0;">
                             {antall_stjerner} <span style="font-size: 1.3rem;">⭐</span>
                         </div>
                         <div style="font-size: 1rem; letter-spacing: 1px;">
@@ -904,7 +888,6 @@ with fane_oppgaver:
                     unsafe_allow_html=True
                 )
 
-    # Nullstill-knapper
     c_dag, c_uke = st.columns(2)
     with c_dag:
         if st.button("☀️ Nullstill rutiner (Manuell)", use_container_width=True):
@@ -923,7 +906,7 @@ with fane_oppgaver:
 
     st.write("")
 
-    # 3. OPPGAVELISTER PER PERSON MED FARGE- OG IKONPROFIL
+    # 3. OPPGAVER MED SKARPT LÅST SORT TEKST VED FULLFØRT/VENTER
     for person in medlemmer:
         prof = hent_profil(person, medlemmer)
         person_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == person]
@@ -946,29 +929,36 @@ with fane_oppgaver:
                 stjerner = oppg.get("stjerner", 1)
                 ikon = oppg.get("ikon", "✨")
 
+                # LÅST STIL UTEN KORRUPT HVIT TEKST:
                 if st_status == "godkjent":
-                    bg_kort, kant_kort = "#F1F5F9", "#CBD5E1"
-                    tekst_stil = "text-decoration: line-through; opacity: 0.6;"
-                    status_badge = "✅ Godkjent (+ stjerner gitt!)"
+                    bg_kort = "#E2E8F0"
+                    kant_kort = "#64748B"
+                    tekst_farge = "#334155 !important;"
+                    tekst_dekor = "text-decoration: line-through;"
+                    status_badge = "<span style='color: #047857 !important; font-weight: 800;'>✅ Godkjent (+ stjerner gitt!)</span>"
                 elif st_status == "venter":
-                    bg_kort, kant_kort = "#FEF3C7", "#F59E0B"
-                    tekst_stil = "font-weight: 700; color: #92400E;"
-                    status_badge = "⏳ Venter på godkjenning..."
+                    bg_kort = "#FEF3C7"
+                    kant_kort = "#F59E0B"
+                    tekst_farge = "#78350F !important;"
+                    tekst_dekor = "font-weight: 800;"
+                    status_badge = "<span style='color: #B45309 !important; font-weight: 800;'>⏳ Venter på godkjenning...</span>"
                 else:
-                    bg_kort, kant_kort = prof["bg"], prof["kant"]
-                    tekst_stil = f"font-weight: 800; color: #0F172A;"
-                    status_badge = f"+{stjerner} ⭐"
+                    bg_kort = prof["bg"]
+                    kant_kort = prof["kant"]
+                    tekst_farge = "#0F172A !important;"
+                    tekst_dekor = "font-weight: 800;"
+                    status_badge = f"<span style='color: #0F172A !important; font-weight: 800;'>+{stjerner} ⭐</span>"
 
                 st.markdown(
                     f"""
-                    <div style="background-color: {bg_kort}; border-left: 6px solid {kant_kort}; 
-                                border-radius: 10px; padding: 10px 14px; margin-bottom: 6px;">
+                    <div style="background-color: {bg_kort} !important; border-left: 6px solid {kant_kort} !important; 
+                                border-radius: 10px; padding: 10px 14px; margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 1.15rem; {tekst_stil}">
-                                <span style="font-size: 1.4rem; margin-right: 6px;">{ikon}</span> {oppg['tekst']}
+                            <span style="font-size: 1.15rem; color: {tekst_farge} {tekst_dekor}">
+                                <span style="font-size: 1.35rem; margin-right: 6px;">{ikon}</span> {oppg['tekst']}
                             </span>
-                            <span style="background: rgba(255,255,255,0.8); border: 1px solid rgba(0,0,0,0.1); 
-                                         padding: 3px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 800;">
+                            <span style="background: rgba(255,255,255,0.85) !important; border: 1.5px solid rgba(0,0,0,0.12) !important; 
+                                         padding: 3px 8px; border-radius: 10px; font-size: 0.75rem;">
                                 {status_badge}
                             </span>
                         </div>
@@ -1006,14 +996,27 @@ with fane_oppgaver:
                 tot_stjerner = oppg.get("stjerner", 2)
                 ikon = oppg.get("ikon", "🤝")
 
+                if st_status == "godkjent":
+                    bg_kort, kant_kort = "#E2E8F0", "#64748B"
+                    t_farge = "#334155 !important;"
+                    t_dekor = "text-decoration: line-through;"
+                elif st_status == "venter":
+                    bg_kort, kant_kort = "#FEF3C7", "#F59E0B"
+                    t_farge = "#78350F !important;"
+                    t_dekor = "font-weight: 800;"
+                else:
+                    bg_kort, kant_kort = prof_felles["bg"], prof_felles["kant"]
+                    t_farge = "#0F172A !important;"
+                    t_dekor = "font-weight: 800;"
+
                 st.markdown(
                     f"""
-                    <div style="background-color: {prof_felles['bg']}; border-left: 6px solid {prof_felles['kant']}; 
+                    <div style="background-color: {bg_kort} !important; border-left: 6px solid {kant_kort} !important; 
                                 border-radius: 10px; padding: 10px 14px; margin-bottom: 6px;">
-                        <span style="font-size: 1.15rem; font-weight: 800; color: #0F172A;">
-                            <span style="font-size: 1.4rem; margin-right: 6px;">{ikon}</span> {oppg['tekst']}
+                        <span style="font-size: 1.15rem; color: {t_farge} {t_dekor}">
+                            <span style="font-size: 1.35rem; margin-right: 6px;">{ikon}</span> {oppg['tekst']}
                         </span>
-                        <span style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-left: 8px;">
+                        <span style="font-size: 0.85rem; font-weight: 700; color: #475569 !important; margin-left: 8px;">
                             (+{tot_stjerner} ⭐ deles)
                         </span>
                     </div>
@@ -1400,9 +1403,9 @@ with fane_aktiviteter:
     if "trukket_aktivitet" in st.session_state:
         st.markdown(
             f"""
-            <div style="background-color: #ECFDF5; border: 2px solid #10B981; border-radius: 12px; padding: 18px; text-align: center; margin: 14px 0;">
-                <div style="font-size: 1.1rem; color: #047857; font-weight: 800;">Dagens utvalgte aktivitet:</div>
-                <div style="font-size: 1.45rem; font-weight: 900; color: #065F46; margin-top: 6px;">
+            <div style="background-color: #ECFDF5 !important; border: 2px solid #10B981 !important; border-radius: 12px; padding: 18px; text-align: center; margin: 14px 0;">
+                <div style="font-size: 1.1rem; color: #047857 !important; font-weight: 800;">Dagens utvalgte aktivitet:</div>
+                <div style="font-size: 1.45rem; font-weight: 900; color: #065F46 !important; margin-top: 6px;">
                     {st.session_state['trukket_aktivitet']}
                 </div>
             </div>
