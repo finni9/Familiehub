@@ -1361,7 +1361,7 @@ with fane_statistikk:
     else:
         st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE 4: MIDDAG & FRYSER (OPPDELT & KOMPRIMERT) -----------------
+# ----------------- FANE 4: MIDDAG & FRYSER (OPPDELT & KOMPRIMERT MED BILDEBEGRENSNING) -----------------
 with fane_middag:
     # 1. KOMPRIMERT FRYSER OG MATSKAP (SIDE OM SIDE)
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
@@ -1372,7 +1372,6 @@ with fane_middag:
         slett_f_id = None
         col_fryser, col_matskap = st.columns(2)
 
-        # Venstre kolonne: Fryser
         with col_fryser:
             st.markdown("##### 🧊 Fryser")
             if varer_fryser:
@@ -1390,7 +1389,6 @@ with fane_middag:
             else:
                 st.caption("Tomt i fryseren.")
 
-        # Høyre kolonne: Matskap
         with col_matskap:
             st.markdown("##### 🥫 Matskap / Tørrvare")
             if varer_matskap:
@@ -1447,7 +1445,7 @@ with fane_middag:
 
     st.write("---")
     
-    # 2. KOMPAKT RUTENETT FOR UKEMENYEN (2 OG 2 SAMMEN)
+    # 2. KOMPAKT RUTENETT FOR UKEMENYEN MED LITE BILDE PÅ DAGSRUTEN
     st.markdown("#### 📅 Ukens Middagsplan")
     
     dag_rader = [
@@ -1482,6 +1480,17 @@ with fane_middag:
                 else:
                     st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 2px;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
 
+                # FORHÅNDSVISNINGS-BILDE I KOMPAKT FORMAT
+                if valgt_rett in oppskrifter and oppskrifter[valgt_rett].get("bilde"):
+                    st.markdown(
+                        f"""
+                        <div style="width: 100%; height: 90px; overflow: hidden; border-radius: 6px; margin: 4px 0 6px 0; border: 1px solid #334155;">
+                            <img src="{oppskrifter[valgt_rett]['bilde']}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
                 c_inn, c_kjop = st.columns([0.80, 0.20])
                 ny_rett = c_inn.text_input(
                     f"Rett {dag}", 
@@ -1513,12 +1522,11 @@ with fane_middag:
 
     st.write("---")
 
-    # 3. KOMPRIMERT BILDEKOKEBOK (2 KOLONNER I BREDDEN MED FAST BILDEHØYDE)
+    # 3. KOMPRIMERT BILDEKOKEBOK (2 KOLONNER I BREDDEN MED LÅST 130PX BILDEHØYDE)
     with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
         oppskrift_nokler = sorted(list(oppskrifter.keys()))
         
-        # Vis oppskrifter 2 og 2 ved siden av hverandre
         for r_idx in range(0, len(oppskrift_nokler), 2):
             par = oppskrift_nokler[r_idx:r_idx + 2]
             cols_par = st.columns(len(par))
@@ -1540,10 +1548,25 @@ with fane_middag:
                         unsafe_allow_html=True
                     )
                     
+                    # KOMPAKT BILDEVISNING: Maks 130px høyde med cover-beskjæring
                     if bilde_url:
-                        st.image(bilde_url, use_container_width=True)
+                        st.markdown(
+                            f"""
+                            <div style="width: 100%; height: 130px; overflow: hidden; border-radius: 8px; margin-bottom: 6px; border: 1px solid #334155;">
+                                <img src="{bilde_url}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
                     else:
-                        st.caption("📷 Ingen bilde enda")
+                        st.markdown(
+                            """
+                            <div style="width: 100%; height: 70px; background-color: #0F172A; border: 1px dashed #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
+                                <span style="font-size: 0.8rem; color: #64748B;">📷 Ingen bilde lagt til</span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
 
                     ingr_kort = ", ".join(ingr_liste[:4])
                     if len(ingr_liste) > 4:
@@ -1582,7 +1605,7 @@ with fane_middag:
                 nytt_opp_bilde = col_nr2.file_uploader("Bilde (valgfritt):", type=["png", "jpg", "jpeg"])
                 ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
                 
-                if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
+                if st.form_submit_button("Lagre oppgave", use_container_width=True) and ny_r.strip():
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
