@@ -1356,7 +1356,7 @@ with fane_statistikk:
     else:
         st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE 4: MIDDAG & FRYSER (MED HALVERT BILDESTØRRELSE) -----------------
+# ----------------- FANE 4: MIDDAG & FRYSER (FASTE BALANSERTE PROPORSJONER) -----------------
 with fane_middag:
     # 1. FRYSER OG MATSKAP (SIDE OM SIDE)
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
@@ -1440,7 +1440,7 @@ with fane_middag:
 
     st.write("---")
     
-    # 2. KOMPAKT RUTENETT FOR UKEMENYEN MED HALVERT BILDESTØRRELSE
+    # 2. KOMPAKT RUTENETT FOR UKEMENYEN MED FASTE PROPORSJONER PÅ BILDE
     st.markdown("#### 📅 Ukens Middagsplan")
     
     dag_rader = [
@@ -1475,12 +1475,12 @@ with fane_middag:
                 else:
                     st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 2px;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
 
-                # HALVERT FORHÅNDSVISNINGSBILDE (50 % BREDDE SENTRERT)
+                # FAST BALANSERT BILDE (110px bredde x 80px høyde)
                 if valgt_rett in oppskrifter and oppskrifter[valgt_rett].get("bilde"):
                     st.markdown(
                         f"""
                         <div style="display: flex; justify-content: center; margin: 4px 0 6px 0;">
-                            <div style="width: 50%; max-height: 70px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; border: 1px solid #334155;">
+                            <div style="width: 110px; height: 80px; overflow: hidden; border-radius: 8px; border: 1px solid #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
                                 <img src="{oppskrifter[valgt_rett]['bilde']}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
                             </div>
                         </div>
@@ -1519,7 +1519,7 @@ with fane_middag:
 
     st.write("---")
 
-    # 3. KOMPRIMERT BILDEKOKEBOK MED HALVERT BILDESTØRRELSE
+    # 3. KOMPRIMERT BILDEKOKEBOK MED FASTE BALANSERTE BILDER (140px x 100px)
     with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
         oppskrift_nokler = sorted(list(oppskrifter.keys()))
@@ -1545,12 +1545,12 @@ with fane_middag:
                         unsafe_allow_html=True
                     )
                     
-                    # HALVERT STØRRELSE I KOKEBOKEN (55 % BREDDE SENTRERT, MAKS 85PX HØYDE)
+                    # FAST BALANSERT BILDEVISNING I KOKEBOKEN (140px bredde x 100px høyde)
                     if bilde_url:
                         st.markdown(
                             f"""
                             <div style="display: flex; justify-content: center; margin-bottom: 6px;">
-                                <div style="width: 55%; max-height: 85px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; border: 1px solid #334155;">
+                                <div style="width: 140px; height: 100px; overflow: hidden; border-radius: 8px; border: 1px solid #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
                                     <img src="{bilde_url}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
                                 </div>
                             </div>
@@ -1561,7 +1561,7 @@ with fane_middag:
                         st.markdown(
                             """
                             <div style="display: flex; justify-content: center; margin-bottom: 6px;">
-                                <div style="width: 55%; height: 50px; background-color: #0F172A; border: 1px dashed #334155; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                <div style="width: 140px; height: 60px; background-color: #0F172A; border: 1px dashed #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
                                     <span style="font-size: 0.72rem; color: #64748B;">📷 Ingen bilde</span>
                                 </div>
                             </div>
