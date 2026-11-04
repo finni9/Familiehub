@@ -153,11 +153,11 @@ def bilde_til_base64(opplastet_fil):
     try:
         bilde = Image.open(opplastet_fil)
         bilde = bilde.convert("RGB")
-        max_str = 400
+        max_str = 500
         if max(bilde.size) > max_str:
             bilde.thumbnail((max_str, max_str), Image.Resampling.LANCZOS)
         buffer = io.BytesIO()
-        bilde.save(buffer, format="JPEG", quality=60, optimize=True)
+        bilde.save(buffer, format="JPEG", quality=65, optimize=True)
         kodet = base64.b64encode(buffer.getvalue()).decode("utf-8")
         return f"data:image/jpeg;base64,{kodet}"
     except Exception:
@@ -878,7 +878,6 @@ with fane_oppgaver:
     medlemmer = data.get("medlemmer", [])
     stjerne_brukere = data.get("stjerne_brukere", [])
 
-    # 1. FORELDREGODKJENNING
     oppgaver_til_godkjenning = [o for o in data["oppgaver"] if o.get("status") == "venter"]
     
     if er_forelder and oppgaver_til_godkjenning:
@@ -942,7 +941,6 @@ with fane_oppgaver:
                     st.rerun()
             st.divider()
 
-    # 2. STJERNETAVLE
     if stjerne_brukere:
         st.markdown("#### 🌟 Familiens Stjernetavle")
         kolonner = st.columns(len(stjerne_brukere))
@@ -991,7 +989,6 @@ with fane_oppgaver:
 
     st.write("")
 
-    # 3. OPPGAVER PER PERSON
     for person in medlemmer:
         prof = hent_profil(person, medlemmer)
         person_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == person]
@@ -1073,7 +1070,6 @@ with fane_oppgaver:
                         if st.button("✕", key=f"del_op_{oppg_id}", help="Slett oppgave"):
                             slett_id = oppg_id
 
-    # 4. FELLESEOPPGAVER
     felles_oppgaver = [o for o in data["oppgaver"] if o["hvem"] == FELLES_VALG]
     if felles_oppgaver:
         prof_felles = hent_profil(FELLES_VALG, medlemmer)
@@ -1139,7 +1135,6 @@ with fane_oppgaver:
         lagre_naa()
         st.rerun()
 
-    # 5. FORELDRE: LEGG TIL NY OPPGAVE
     if er_forelder:
         st.write("---")
         with st.expander("➕ **Legg til ny oppgave (for voksne)**"):
@@ -1361,9 +1356,9 @@ with fane_statistikk:
     else:
         st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE 4: MIDDAG & FRYSER (OPPDELT & KOMPRIMERT MED BILDEBEGRENSNING) -----------------
+# ----------------- FANE 4: MIDDAG & FRYSER (MED NATURLIG 16:9 BILDEFORMAT) -----------------
 with fane_middag:
-    # 1. KOMPRIMERT FRYSER OG MATSKAP (SIDE OM SIDE)
+    # 1. FRYSER OG MATSKAP (SIDE OM SIDE)
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
         fryser_data = data.get("fryser", [])
         varer_fryser = [v for v in fryser_data if v.get("plassering", "fryser") == "fryser"]
@@ -1445,7 +1440,7 @@ with fane_middag:
 
     st.write("---")
     
-    # 2. KOMPAKT RUTENETT FOR UKEMENYEN MED LITE BILDE PÅ DAGSRUTEN
+    # 2. KOMPAKT RUTENETT FOR UKEMENYEN MED 16:9 BILDEFORMAT
     st.markdown("#### 📅 Ukens Middagsplan")
     
     dag_rader = [
@@ -1480,11 +1475,11 @@ with fane_middag:
                 else:
                     st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 2px;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
 
-                # FORHÅNDSVISNINGS-BILDE I KOMPAKT FORMAT
+                # NATURLIG 16:9 ASPECT-RATIO PÅ FORHÅNDSVISNING
                 if valgt_rett in oppskrifter and oppskrifter[valgt_rett].get("bilde"):
                     st.markdown(
                         f"""
-                        <div style="width: 100%; height: 90px; overflow: hidden; border-radius: 6px; margin: 4px 0 6px 0; border: 1px solid #334155;">
+                        <div style="width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; margin: 4px 0 6px 0; border: 1px solid #334155;">
                             <img src="{oppskrifter[valgt_rett]['bilde']}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
                         </div>
                         """,
@@ -1522,7 +1517,7 @@ with fane_middag:
 
     st.write("---")
 
-    # 3. KOMPRIMERT BILDEKOKEBOK (2 KOLONNER I BREDDEN MED LÅST 130PX BILDEHØYDE)
+    # 3. KOMPRIMERT BILDEKOKEBOK MED 16:9 ASPECT-RATIO
     with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
         oppskrift_nokler = sorted(list(oppskrifter.keys()))
@@ -1548,11 +1543,11 @@ with fane_middag:
                         unsafe_allow_html=True
                     )
                     
-                    # KOMPAKT BILDEVISNING: Maks 130px høyde med cover-beskjæring
+                    # NATURLIG PROPORSJONALT BILDE UTEN FORSTREKKING (16:9)
                     if bilde_url:
                         st.markdown(
                             f"""
-                            <div style="width: 100%; height: 130px; overflow: hidden; border-radius: 8px; margin-bottom: 6px; border: 1px solid #334155;">
+                            <div style="width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; margin-bottom: 6px; border: 1px solid #334155;">
                                 <img src="{bilde_url}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
                             </div>
                             """,
@@ -1561,7 +1556,7 @@ with fane_middag:
                     else:
                         st.markdown(
                             """
-                            <div style="width: 100%; height: 70px; background-color: #0F172A; border: 1px dashed #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
+                            <div style="width: 100%; aspect-ratio: 16 / 9; background-color: #0F172A; border: 1px dashed #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
                                 <span style="font-size: 0.8rem; color: #64748B;">📷 Ingen bilde lagt til</span>
                             </div>
                             """,
@@ -1605,7 +1600,7 @@ with fane_middag:
                 nytt_opp_bilde = col_nr2.file_uploader("Bilde (valgfritt):", type=["png", "jpg", "jpeg"])
                 ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
                 
-                if st.form_submit_button("Lagre oppgave", use_container_width=True) and ny_r.strip():
+                if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
