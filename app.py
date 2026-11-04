@@ -923,7 +923,7 @@ with fane_oppgaver:
                         stjerner_hver = max(1, round(stjerner / max(1, len(hjelpere))))
                         for h in hjelpere:
                             if h in stjerne_brukere:
-                                data["poeng"][h] = data["poeng"].get(h correlation=0) + stjerner_hver
+                                data["poeng"][h] = data["poeng"].get(h, 0) + stjerner_hver
                                 logg_stjerne_hendelse(h, "tjent", stjerner_hver, f"{v_oppg['tekst']} (Felles)")
                         data["uke_oppgaver_lost"] = data.get("uke_oppgaver_lost", 0) + 1
                     
@@ -1624,7 +1624,7 @@ with fane_middag:
                 nytt_opp_bilde = col_nr2.file_uploader("Bilde (valgfritt):", type=["png", "jpg", "jpeg"])
                 ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
                 
-                if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
+                if st.form_submit_button("Lagre oppgave", use_container_width=True) and ny_r.strip():
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
