@@ -153,7 +153,7 @@ def bilde_til_base64(opplastet_fil):
     try:
         bilde = Image.open(opplastet_fil)
         bilde = bilde.convert("RGB")
-        max_str = 500
+        max_str = 400
         if max(bilde.size) > max_str:
             bilde.thumbnail((max_str, max_str), Image.Resampling.LANCZOS)
         buffer = io.BytesIO()
@@ -1356,7 +1356,7 @@ with fane_statistikk:
     else:
         st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE 4: MIDDAG & FRYSER (MED NATURLIG 16:9 BILDEFORMAT) -----------------
+# ----------------- FANE 4: MIDDAG & FRYSER (MED HALVERT BILDESTØRRELSE) -----------------
 with fane_middag:
     # 1. FRYSER OG MATSKAP (SIDE OM SIDE)
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
@@ -1440,7 +1440,7 @@ with fane_middag:
 
     st.write("---")
     
-    # 2. KOMPAKT RUTENETT FOR UKEMENYEN MED 16:9 BILDEFORMAT
+    # 2. KOMPAKT RUTENETT FOR UKEMENYEN MED HALVERT BILDESTØRRELSE
     st.markdown("#### 📅 Ukens Middagsplan")
     
     dag_rader = [
@@ -1475,12 +1475,14 @@ with fane_middag:
                 else:
                     st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 2px;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
 
-                # NATURLIG 16:9 ASPECT-RATIO PÅ FORHÅNDSVISNING
+                # HALVERT FORHÅNDSVISNINGSBILDE (50 % BREDDE SENTRERT)
                 if valgt_rett in oppskrifter and oppskrifter[valgt_rett].get("bilde"):
                     st.markdown(
                         f"""
-                        <div style="width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; margin: 4px 0 6px 0; border: 1px solid #334155;">
-                            <img src="{oppskrifter[valgt_rett]['bilde']}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                        <div style="display: flex; justify-content: center; margin: 4px 0 6px 0;">
+                            <div style="width: 50%; max-height: 70px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; border: 1px solid #334155;">
+                                <img src="{oppskrifter[valgt_rett]['bilde']}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                            </div>
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -1517,7 +1519,7 @@ with fane_middag:
 
     st.write("---")
 
-    # 3. KOMPRIMERT BILDEKOKEBOK MED 16:9 ASPECT-RATIO
+    # 3. KOMPRIMERT BILDEKOKEBOK MED HALVERT BILDESTØRRELSE
     with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
         oppskrift_nokler = sorted(list(oppskrifter.keys()))
@@ -1543,12 +1545,14 @@ with fane_middag:
                         unsafe_allow_html=True
                     )
                     
-                    # NATURLIG PROPORSJONALT BILDE UTEN FORSTREKKING (16:9)
+                    # HALVERT STØRRELSE I KOKEBOKEN (55 % BREDDE SENTRERT, MAKS 85PX HØYDE)
                     if bilde_url:
                         st.markdown(
                             f"""
-                            <div style="width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; margin-bottom: 6px; border: 1px solid #334155;">
-                                <img src="{bilde_url}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                            <div style="display: flex; justify-content: center; margin-bottom: 6px;">
+                                <div style="width: 55%; max-height: 85px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; border: 1px solid #334155;">
+                                    <img src="{bilde_url}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                                </div>
                             </div>
                             """,
                             unsafe_allow_html=True
@@ -1556,8 +1560,10 @@ with fane_middag:
                     else:
                         st.markdown(
                             """
-                            <div style="width: 100%; aspect-ratio: 16 / 9; background-color: #0F172A; border: 1px dashed #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;">
-                                <span style="font-size: 0.8rem; color: #64748B;">📷 Ingen bilde lagt til</span>
+                            <div style="display: flex; justify-content: center; margin-bottom: 6px;">
+                                <div style="width: 55%; height: 50px; background-color: #0F172A; border: 1px dashed #334155; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                    <span style="font-size: 0.72rem; color: #64748B;">📷 Ingen bilde</span>
+                                </div>
                             </div>
                             """,
                             unsafe_allow_html=True
