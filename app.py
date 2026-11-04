@@ -923,7 +923,7 @@ with fane_oppgaver:
                         stjerner_hver = max(1, round(stjerner / max(1, len(hjelpere))))
                         for h in hjelpere:
                             if h in stjerne_brukere:
-                                data["poeng"][h] = data["poeng"].get(h, 0) + stjerner_hver
+                                data["poeng"][h] = data["poeng"].get(h correlation=0) + stjerner_hver
                                 logg_stjerne_hendelse(h, "tjent", stjerner_hver, f"{v_oppg['tekst']} (Felles)")
                         data["uke_oppgaver_lost"] = data.get("uke_oppgaver_lost", 0) + 1
                     
@@ -1356,7 +1356,7 @@ with fane_statistikk:
     else:
         st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE 4: MIDDAG & FRYSER (FASTE BALANSERTE PROPORSJONER) -----------------
+# ----------------- FANE 4: MIDDAG & FRYSER (MED INGREDIENS-REDIGERING) -----------------
 with fane_middag:
     # 1. FRYSER OG MATSKAP (SIDE OM SIDE)
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
@@ -1440,7 +1440,7 @@ with fane_middag:
 
     st.write("---")
     
-    # 2. KOMPAKT RUTENETT FOR UKEMENYEN MED FASTE PROPORSJONER PÅ BILDE
+    # 2. KOMPAKT RUTENETT FOR UKEMENYEN
     st.markdown("#### 📅 Ukens Middagsplan")
     
     dag_rader = [
@@ -1475,7 +1475,6 @@ with fane_middag:
                 else:
                     st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 2px;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
 
-                # FAST BALANSERT BILDE (110px bredde x 80px høyde)
                 if valgt_rett in oppskrifter and oppskrifter[valgt_rett].get("bilde"):
                     st.markdown(
                         f"""
@@ -1519,7 +1518,7 @@ with fane_middag:
 
     st.write("---")
 
-    # 3. KOMPRIMERT BILDEKOKEBOK MED FASTE BALANSERTE BILDER (140px x 100px)
+    # 3. KOMPRIMERT BILDEKOKEBOK MED REDIGERBARE INGREDIENSER
     with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
         oppskrift_nokler = sorted(list(oppskrifter.keys()))
@@ -1545,7 +1544,6 @@ with fane_middag:
                         unsafe_allow_html=True
                     )
                     
-                    # FAST BALANSERT BILDEVISNING I KOKEBOKEN (140px bredde x 100px høyde)
                     if bilde_url:
                         st.markdown(
                             f"""
@@ -1572,15 +1570,33 @@ with fane_middag:
                     ingr_kort = ", ".join(ingr_liste[:4])
                     if len(ingr_liste) > 4:
                         ingr_kort += f" (+{len(ingr_liste)-4} til)"
-                    st.caption(f"Ingredienser: {ingr_kort}" if ingr_liste else "Ingen ingredienser")
+                    st.caption(f"Ingredienser: {ingr_kort}" if ingr_liste else "Ingen ingredienser lagt inn")
 
                     c_dag_sel, c_sett_knapp = st.columns([0.55, 0.45])
                     valgt_dag = c_dag_sel.selectbox(f"Dag for {tittel}", DAGER, key=f"v_dag_{tittel}", label_visibility="collapsed")
                     c_sett_knapp.button("Sett på 📅", key=f"s_meny_{tittel}", on_click=cb_sett_middag, args=(valgt_dag, tittel), use_container_width=True)
 
-                    with st.expander(f"⚙️ Mer / Bilde"):
-                        nytt_bilde_fil = st.file_uploader(f"Bilde:", type=["png", "jpg", "jpeg"], key=f"file_{tittel}")
-                        if st.button("Lagre bilde 💾", key=f"btn_bilde_{tittel}") and nytt_bilde_fil:
+                    # MER / REDIGERING AV INGREDIENSER OG BILDE
+                    with st.expander(f"⚙️ Rediger oppskrift / Bilde"):
+                        st.markdown("**✏️ Endre ingredienser:**")
+                        naavarende_ingr_str = ", ".join(ingr_liste)
+                        ny_ingr_input = st.text_area(
+                            "Ingredienser (komma mellom hver):",
+                            value=naavarende_ingr_str,
+                            key=f"edit_ingr_{tittel}",
+                            help="Skriv ingrediensene adskilt med komma, f.eks: Kjøttdeig, Tacokrydder, Ost"
+                        )
+                        if st.button("Lagre ingredienser 💾", key=f"btn_save_ingr_{tittel}", use_container_width=True):
+                            oppdaterte_ingr = [x.strip() for x in ny_ingr_input.split(",") if x.strip()]
+                            oppskrifter[tittel]["ingredienser"] = oppdaterte_ingr
+                            if lagre_naa():
+                                st.toast(f"Ingredienser for {tittel} er oppdatert! 🥗")
+                                st.rerun()
+
+                        st.write("---")
+                        st.markdown("**📸 Bytt bilde:**")
+                        nytt_bilde_fil = st.file_uploader(f"Last opp bilde:", type=["png", "jpg", "jpeg"], key=f"file_{tittel}")
+                        if st.button("Lagre bilde 💾", key=f"btn_bilde_{tittel}", use_container_width=True) and nytt_bilde_fil:
                             b64 = bilde_til_base64(nytt_bilde_fil)
                             if b64:
                                 oppskrifter[tittel]["bilde"] = b64
@@ -1588,8 +1604,10 @@ with fane_middag:
                                     st.toast(f"Bilde lagret for {tittel}!")
                                     st.rerun()
 
-                        if er_forelder and st.button("Slett rett ✕", key=f"del_op_{tittel}", use_container_width=True):
-                            slett_oppskrift = tittel
+                        if er_forelder:
+                            st.write("---")
+                            if st.button("Slett rett ✕", key=f"del_op_{tittel}", use_container_width=True):
+                                slett_oppskrift = tittel
             st.write("")
 
         if slett_oppskrift:
