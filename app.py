@@ -443,6 +443,11 @@ raw_data["oppgaver"] = migrer_oppgaver(raw_data.get("oppgaver", []))
 raw_data["handleliste"] = migrer_handleliste(raw_data.get("handleliste", []))
 raw_data["middagsplan"] = migrer_middagsplan(raw_data.get("middagsplan", {}))
 
+# Migrere sparemål til å ha 'spart'-felt hvis det mangler
+for p, s_info in raw_data.get("sparemaal", {}).items():
+    if isinstance(s_info, dict) and "spart" not in s_info:
+        s_info["spart"] = 0
+
 data = raw_data
 
 def lagre_naa():
@@ -1163,9 +1168,10 @@ with fane_oppgaver:
                     st.toast("Oppgave lagret!")
                     st.rerun()
 
-# ----------------- FANE 2: BUTIKK & SPAREMÅL -----------------
+# ----------------- FANE 2: BUTIKK & SPAREMÅL (MED LÅSTE INNBETALINGER) -----------------
 with fane_butikk:
     st.subheader("🎯 Barnas Sparemål")
+    st.caption("Her kan barna spare målrettet ved å overføre stjerner rett inn i sparebøssa!")
     stjerne_brukere = data.get("stjerne_brukere", [])
 
     if stjerne_brukere:
@@ -1178,23 +1184,85 @@ with fane_butikk:
                 if maal_info:
                     maal_tittel = maal_info.get("tittel", "Mål")
                     maal_pris = max(1, int(maal_info.get("pris", 10)))
-                    framgang = min(1.0, saldo / maal_pris)
+                    spart_naa = int(maal_info.get("spart", 0))
+                    framgang = min(1.0, spart_naa / maal_pris)
                     prosent = int(framgang * 100)
                     
-                    st.markdown(f"**{prof['ikon']} {p} sparer til: {maal_tittel}** (`{saldo} / {maal_pris} ⭐` — {prosent}%)")
+                    st.markdown(
+                        f"""
+                        <div style="background-color: #1E293B; border-left: 5px solid {prof['kant']}; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 800; font-size: 1.05rem; color: #FFFFFF;">
+                                    {prof['ikon']} {p} sparer til: <span style="color: #FCD34D;">{maal_tittel}</span>
+                                </span>
+                                <span style="font-weight: 800; font-size: 0.95rem; color: #34D399;">
+                                    {spart_naa} / {maal_pris} ⭐ ({prosent}%)
+                                </span>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
                     st.progress(framgang)
                     
-                    c_m1, c_m2 = st.columns([0.65, 0.35])
-                    with c_m1:
-                        if saldo >= maal_pris:
-                            st.success(f"🎉 Målet er nådd! {p} kan løse det inn!")
-                        else:
-                            st.caption(f"Mangler {maal_pris - saldo} ⭐ før målet nås.")
-                    with c_m2:
-                        if st.button("Fjern mål ✕", key=f"slett_maal_{p}"):
-                            del data["sparemaal"][p]
-                            lagre_naa()
-                            st.rerun()
+                    # KNAPPER FOR INNBETALING OG INNLØSING
+                    if spart_naa >= maal_pris:
+                        st.success(f"🎉 Målet er nådd! {p} har spart opp hele beløpet og kan hente premien sin!")
+                        c_in1, c_in2 = st.columns([0.65, 0.35])
+                        with c_in1:
+                            if st.button(f"🎁 Løs inn {maal_tittel}! 🎉", key=f"innlos_maal_{p}", use_container_width=True):
+                                logg_stjerne_hendelse(p, "brukt", spart_naa, f"Nådde sparemål: {maal_tittel}")
+                                del data["sparemaal"][p]
+                                lagre_naa()
+                                st.balloons()
+                                st.toast(f"🎉 Gratulerer {p}! Du nådde målet ditt!")
+                                st.rerun()
+                        with c_in2:
+                            if st.button("Fjern mål ✕", key=f"slett_fullt_maal_{p}", help="Slett og behold stjernene"):
+                                data["poeng"][p] = data["poeng"].get(p, 0) + spart_naa
+                                del data["sparemaal"][p]
+                                lagre_naa()
+                                st.rerun()
+                    else:
+                        mangler = maal_pris - spart_naa
+                        c_spar1, c_spar2, c_angre = st.columns([0.35, 0.35, 0.30])
+                        
+                        # Betal inn 1 ⭐
+                        with c_spar1:
+                            kan_spare_1 = saldo >= 1
+                            if st.button(f"+1 ⭐ i sparebøssa", key=f"spar_1_{p}", disabled=not kan_spare_1, use_container_width=True):
+                                data["poeng"][p] -= 1
+                                maal_info["spart"] = spart_naa + 1
+                                logg_stjerne_hendelse(p, "brukt", 1, f"Låst i sparemål ({maal_tittel})")
+                                lagre_naa()
+                                st.toast(f"Puttet 1 ⭐ i sparebøssa for {p}!")
+                                st.rerun()
+
+                        # Betal inn opptil 5 ⭐ (eller det man mangler)
+                        with c_spar2:
+                            innskudd_5 = min(5, saldo, mangler)
+                            kan_spare_flere = innskudd_5 > 1
+                            tekst_flere = f"+{innskudd_5} ⭐ i sparebøssa" if kan_spare_flere else "+5 ⭐ i sparebøssa"
+                            if st.button(tekst_flere, key=f"spar_flere_{p}", disabled=not kan_spare_flere, use_container_width=True):
+                                data["poeng"][p] -= innskudd_5
+                                maal_info["spart"] = spart_naa + innskudd_5
+                                logg_stjerne_hendelse(p, "brukt", innskudd_5, f"Låst i sparemål ({maal_tittel})")
+                                lagre_naa()
+                                st.toast(f"Puttet {innskudd_5} ⭐ i sparebøssa for {p}!")
+                                st.rerun()
+
+                        # Avbryt sparemål (tilbakefører låste stjerner til saldo)
+                        with c_angre:
+                            if st.button("Avbryt / Hent ut ✕", key=f"slett_maal_{p}", help="Avbryt sparemål og overfør låste stjerner tilbake til saldo"):
+                                data["poeng"][p] = data["poeng"].get(p, 0) + spart_naa
+                                if spart_naa > 0:
+                                    logg_stjerne_hendelse(p, "tjent", spart_naa, f"Hentet ut fra avbrutt sparemål ({maal_tittel})")
+                                del data["sparemaal"][p]
+                                lagre_naa()
+                                st.toast(f"Sparemålet ble avbrutt. {spart_naa} ⭐ er tilbakeført til {p} sin saldo.")
+                                st.rerun()
+
+                        st.caption(f"💡 {p} har **{saldo} ⭐** tilgjengelig. Mangler **{mangler} ⭐** for å nå målet.")
                 else:
                     st.info(f"{prof['ikon']} {p} har ikke satt noe sparemål enda.")
                     with st.expander(f"➕ Sett sparemål for {p}"):
@@ -1203,7 +1271,11 @@ with fane_butikk:
                             ny_m_pris = st.number_input("Hvor mange stjerner koster det?", min_value=1, max_value=200, value=25)
                             if st.form_submit_button("Start sparing! 🚀") and ny_m_tittel.strip():
                                 if "sparemaal" not in data: data["sparemaal"] = {}
-                                data["sparemaal"][p] = {"tittel": ny_m_tittel.strip(), "pris": int(ny_m_pris)}
+                                data["sparemaal"][p] = {
+                                    "tittel": ny_m_tittel.strip(),
+                                    "pris": int(ny_m_pris),
+                                    "spart": 0
+                                }
                                 lagre_naa()
                                 st.rerun()
                 st.write("")
@@ -1212,7 +1284,7 @@ with fane_butikk:
     st.subheader("🎁 Belønningsbutikk")
     if stjerne_brukere:
         saldo_tekst = " | ".join([f"**{p}:** {data['poeng'].get(p, 0)} ⭐" for p in stjerne_brukere])
-        st.info(f"💳 {saldo_tekst}")
+        st.info(f"💳 Ledig saldo (ikke låst i sparemål): {saldo_tekst}")
 
     slett_belonning_id = None
     for bel in data.get("belonninger", []):
@@ -1358,7 +1430,6 @@ with fane_statistikk:
 
 # ----------------- FANE 4: MIDDAG & FRYSER (MED INGREDIENS-REDIGERING) -----------------
 with fane_middag:
-    # 1. FRYSER OG MATSKAP (SIDE OM SIDE)
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
         fryser_data = data.get("fryser", [])
         varer_fryser = [v for v in fryser_data if v.get("plassering", "fryser") == "fryser"]
@@ -1440,7 +1511,6 @@ with fane_middag:
 
     st.write("---")
     
-    # 2. KOMPAKT RUTENETT FOR UKEMENYEN
     st.markdown("#### 📅 Ukens Middagsplan")
     
     dag_rader = [
@@ -1518,7 +1588,6 @@ with fane_middag:
 
     st.write("---")
 
-    # 3. KOMPRIMERT BILDEKOKEBOK MED REDIGERBARE INGREDIENSER
     with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
         slett_oppskrift = None
         oppskrift_nokler = sorted(list(oppskrifter.keys()))
@@ -1576,7 +1645,6 @@ with fane_middag:
                     valgt_dag = c_dag_sel.selectbox(f"Dag for {tittel}", DAGER, key=f"v_dag_{tittel}", label_visibility="collapsed")
                     c_sett_knapp.button("Sett på 📅", key=f"s_meny_{tittel}", on_click=cb_sett_middag, args=(valgt_dag, tittel), use_container_width=True)
 
-                    # MER / REDIGERING AV INGREDIENSER OG BILDE
                     with st.expander(f"⚙️ Rediger oppskrift / Bilde"):
                         st.markdown("**✏️ Endre ingredienser:**")
                         naavarende_ingr_str = ", ".join(ingr_liste)
@@ -1624,7 +1692,7 @@ with fane_middag:
                 nytt_opp_bilde = col_nr2.file_uploader("Bilde (valgfritt):", type=["png", "jpg", "jpeg"])
                 ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
                 
-                if st.form_submit_button("Lagre oppgave", use_container_width=True) and ny_r.strip():
+                if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
