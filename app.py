@@ -62,6 +62,33 @@ STANDARD_BASISVARER = [
     {"id": "b6", "label": "☕ Kaffe", "navn": "Kaffe", "kategori": "🍞 Tørrvare, Krydder & Kolonial"},
 ]
 
+STANDARD_PAKKEMALER = {
+    "🌲 Skogs- og fjæretur": [
+        {"ikon": "🥾", "tekst": "Gode sko / støvler"},
+        {"ikon": "🌧️", "tekst": "Vindtett jakke / regntøy"},
+        {"ikon": "🧦", "tekst": "Ekstra sokker"},
+        {"ikon": "🪵", "tekst": "Sitteunderlag"},
+        {"ikon": "🍶", "tekst": "Vannflaske / termos med kakao"},
+        {"ikon": "🥪", "tekst": "Matpakke & tur-snacks"}
+    ],
+    "🏊 Badeland / Svømming": [
+        {"ikon": "🩲", "tekst": "Badetøy"},
+        {"ikon": "🧖", "tekst": "Stort håndkle"},
+        {"ikon": "🥽", "tekst": "Svømmebriller / armringer"},
+        {"ikon": "🧼", "tekst": "Dusjsåpe & sjampo"},
+        {"ikon": "🩴", "tekst": "Badesandaler"},
+        {"ikon": "🧴", "tekst": "Bodylotion"}
+    ],
+    "🏕️ Helgetur / Hytte": [
+        {"ikon": "🪥", "tekst": "Tannbørste & tannkrem"},
+        {"ikon": "🧸", "tekst": "Kosebamse & favorittleke"},
+        {"ikon": "👕", "tekst": "Skiftetøy (2 sett)"},
+        {"ikon": "🧦", "tekst": "Ullsokker & undertøy"},
+        {"ikon": "🌙", "tekst": "Pysjamas"},
+        {"ikon": "🔌", "tekst": "Ladere & hodetelefoner"}
+    ]
+}
+
 STANDARD_AKTIVITETER = [
     "🎲 Spille brettspill sammen",
     "🍿 Lage popcorn og se en god familiefilm",
@@ -236,6 +263,19 @@ def migrer_fryser(gammel_liste):
             ny_liste.append({"id": str(uuid.uuid4()), "navn": item, "plassering": "fryser"})
     return ny_liste
 
+def migrer_pakkeliste(gammel_pakkeliste):
+    if not isinstance(gammel_pakkeliste, list):
+        return []
+    ny_liste = []
+    for p in gammel_pakkeliste:
+        if isinstance(p, dict):
+            if "id" not in p: p["id"] = str(uuid.uuid4())
+            if "ikon" not in p: p["ikon"] = "🎒"
+            if "pakket" not in p: p["pakket"] = False
+            if "til" not in p: p["til"] = "Felles"
+            ny_liste.append(p)
+    return ny_liste
+
 def standard_data(valgt_pin="1234"):
     idag_str = datetime.now(TIDSSONE_NORGE).strftime("%Y-%m-%d")
     return {
@@ -246,6 +286,7 @@ def standard_data(valgt_pin="1234"):
         "stjerne_brukere": ["Barn 1", "Barn 2"],
         "poeng": {"Far": 0, "Mor": 0, "Barn 1": 0, "Barn 2": 0},
         "sparemaal": {},
+        "pakkeliste": [],
         "aktiviteter": STANDARD_AKTIVITETER,
         "stjerne_logg": [],
         "fryser": [
@@ -434,16 +475,17 @@ if "oppskrifter" not in raw_data: raw_data["oppskrifter"] = STANDARD_MIDDAGER
 else: raw_data["oppskrifter"] = migrer_oppskrifter(raw_data["oppskrifter"])
 if "basisvarer" not in raw_data: raw_data["basisvarer"] = STANDARD_BASISVARER
 if "sparemaal" not in raw_data: raw_data["sparemaal"] = {}
+if "pakkeliste" not in raw_data: raw_data["pakkeliste"] = []
 if "aktiviteter" not in raw_data: raw_data["aktiviteter"] = STANDARD_AKTIVITETER
 if "uke_oppgaver_lost" not in raw_data: raw_data["uke_oppgaver_lost"] = 0
 if "stjerne_logg" not in raw_data: raw_data["stjerne_logg"] = []
 
 raw_data["fryser"] = migrer_fryser(raw_data.get("fryser", []))
+raw_data["pakkeliste"] = migrer_pakkeliste(raw_data.get("pakkeliste", []))
 raw_data["oppgaver"] = migrer_oppgaver(raw_data.get("oppgaver", []))
 raw_data["handleliste"] = migrer_handleliste(raw_data.get("handleliste", []))
 raw_data["middagsplan"] = migrer_middagsplan(raw_data.get("middagsplan", {}))
 
-# Migrere sparemål til å ha 'spart'-felt hvis det mangler
 for p, s_info in raw_data.get("sparemaal", {}).items():
     if isinstance(s_info, dict) and "spart" not in s_info:
         s_info["spart"] = 0
@@ -615,7 +657,7 @@ def aapne_pin_dialog():
     if c_avbr.button("Avbryt", use_container_width=True):
         st.rerun()
 
-# ----------------- TOPPSTRIPE (VARM SOLNEDGANG) -----------------
+# ----------------- TOPPSTRIPE -----------------
 naa = datetime.now(TIDSSONE_NORGE)
 dag_indeks = naa.weekday()
 idag_navn = DAGER[dag_indeks]
@@ -869,12 +911,12 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
 
 er_forelder = st.session_state["foreldremodus"]
 
-fane_navn = ["⭐ Oppgaver", "🎁 Butikk & Mål", "📊 Stjernelogg", "🍽️ Middag & Fryser", "🛒 Handleliste", "🎲 Aktiviteter"]
+fane_navn = ["⭐ Oppgaver", "🎁 Butikk & Mål", "📊 Stjernelogg", "🍽️ Middag & Fryser", "🛒 Handleliste", "🧳 Pakkeliste", "🎲 Aktiviteter"]
 if er_forelder: fane_navn.append("👨‍👩‍👧‍👦 Admin")
 
 faner = st.tabs(fane_navn)
-fane_oppgaver, fane_butikk, fane_statistikk, fane_middag, fane_handleliste, fane_aktiviteter = faner[0], faner[1], faner[2], faner[3], faner[4], faner[5]
-fane_familie = faner[6] if er_forelder else None
+fane_oppgaver, fane_butikk, fane_statistikk, fane_middag, fane_handleliste, fane_pakkeliste, fane_aktiviteter = faner[0], faner[1], faner[2], faner[3], faner[4], faner[5], faner[6]
+fane_familie = faner[7] if er_forelder else None
 
 # ----------------- FANE 1: OPPGAVER & GODKJENNING -----------------
 with fane_oppgaver:
@@ -1205,7 +1247,6 @@ with fane_butikk:
                     )
                     st.progress(framgang)
                     
-                    # KNAPPER FOR INNBETALING OG INNLØSING
                     if spart_naa >= maal_pris:
                         st.success(f"🎉 Målet er nådd! {p} har spart opp hele beløpet og kan hente premien sin!")
                         c_in1, c_in2 = st.columns([0.65, 0.35])
@@ -1227,7 +1268,6 @@ with fane_butikk:
                         mangler = maal_pris - spart_naa
                         c_spar1, c_spar2, c_angre = st.columns([0.35, 0.35, 0.30])
                         
-                        # Betal inn 1 ⭐
                         with c_spar1:
                             kan_spare_1 = saldo >= 1
                             if st.button(f"+1 ⭐ i sparebøssa", key=f"spar_1_{p}", disabled=not kan_spare_1, use_container_width=True):
@@ -1238,7 +1278,6 @@ with fane_butikk:
                                 st.toast(f"Puttet 1 ⭐ i sparebøssa for {p}!")
                                 st.rerun()
 
-                        # Betal inn opptil 5 ⭐ (eller det man mangler)
                         with c_spar2:
                             innskudd_5 = min(5, saldo, mangler)
                             kan_spare_flere = innskudd_5 > 1
@@ -1251,7 +1290,6 @@ with fane_butikk:
                                 st.toast(f"Puttet {innskudd_5} ⭐ i sparebøssa for {p}!")
                                 st.rerun()
 
-                        # Avbryt sparemål (tilbakefører låste stjerner til saldo)
                         with c_angre:
                             if st.button("Avbryt / Hent ut ✕", key=f"slett_maal_{p}", help="Avbryt sparemål og overfør låste stjerner tilbake til saldo"):
                                 data["poeng"][p] = data["poeng"].get(p, 0) + spart_naa
@@ -1284,7 +1322,7 @@ with fane_butikk:
     st.subheader("🎁 Belønningsbutikk")
     if stjerne_brukere:
         saldo_tekst = " | ".join([f"**{p}:** {data['poeng'].get(p, 0)} ⭐" for p in stjerne_brukere])
-        st.info(f"💳 Ledig saldo (ikke låst i sparemål): {saldo_tekst}")
+        st.info(f"💳 Ledig saldo: {saldo_tekst}")
 
     slett_belonning_id = None
     for bel in data.get("belonninger", []):
@@ -1428,7 +1466,7 @@ with fane_statistikk:
     else:
         st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE 4: MIDDAG & FRYSER (MED INGREDIENS-REDIGERING) -----------------
+# ----------------- FANE 4: MIDDAG & FRYSER -----------------
 with fane_middag:
     with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
         fryser_data = data.get("fryser", [])
@@ -1692,7 +1730,7 @@ with fane_middag:
                 nytt_opp_bilde = col_nr2.file_uploader("Bilde (valgfritt):", type=["png", "jpg", "jpeg"])
                 ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
                 
-                if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
+                if st.form_submit_button("Lagre oppgave", use_container_width=True) and ny_r.strip():
                     ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                     b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                     data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
@@ -1781,7 +1819,126 @@ with fane_handleliste:
             lagre_naa()
             st.rerun()
 
-# ----------------- FANE 6: AKTIVITETER -----------------
+# ----------------- FANE 6: PAKKELISTE (FOR UTFLUKTER & TURER) -----------------
+with fane_pakkeliste:
+    st.subheader("🧳 Smart Pakkeliste for tur & utflukter")
+    st.caption("Gjør pakkingen til en lek! Barna kan krysse av tingene sine selv.")
+
+    pakkeliste = data.get("pakkeliste", [])
+    medlemmer = data.get("medlemmer", ["Far", "Mor", "Barn 1", "Barn 2"])
+
+    # HURTIGMALER
+    with st.expander("⚡ **Hent inn en ferdig tur-pakkeliste**", expanded=(len(pakkeliste) == 0)):
+        st.write("Velg en mal for å fylle listen automatisk:")
+        col_m1, col_m2 = st.columns([0.65, 0.35])
+        valgt_mal_navn = col_m1.selectbox("Velg tur-type:", list(STANDARD_PAKKEMALER.keys()), label_visibility="collapsed")
+        hvem_pakker_mal = col_m2.selectbox("Til hvem?", ["Felles"] + medlemmer, label_visibility="collapsed")
+        
+        if st.button("Legg til malen i listen 🎒", use_container_width=True):
+            items_mal = STANDARD_PAKKEMALER[valgt_mal_navn]
+            for itm in items_mal:
+                pakkeliste.append({
+                    "id": str(uuid.uuid4()),
+                    "tekst": itm["tekst"],
+                    "ikon": itm["ikon"],
+                    "til": hvem_pakker_mal,
+                    "pakket": False
+                })
+            lagre_naa()
+            st.toast(f"Lagt til pakkeliste for {valgt_mal_navn}!")
+            st.rerun()
+
+    st.write("---")
+
+    # NYTT ELEMENT
+    with st.form("form_ny_pakke_ting", clear_on_submit=True):
+        col_pi_tekst, col_pi_ikon, col_pi_til, col_pi_btn = st.columns([0.45, 0.20, 0.20, 0.15])
+        p_tekst = col_pi_tekst.text_input("Hva skal pakkes?", placeholder="f.eks. Regnvotter, Hodelykt")
+        p_ikon = col_pi_ikon.selectbox("Ikon:", ["🧸", "🥾", "🌧️", "🧦", "🪥", "🥪", "🍶", "👙", "🌙", "🎒", "🔋", "✨"])
+        p_til = col_pi_til.selectbox("I sekken til:", ["Felles"] + medlemmer)
+        
+        if col_pi_btn.form_submit_button("Legg til", use_container_width=True) and p_tekst.strip():
+            pakkeliste.append({
+                "id": str(uuid.uuid4()),
+                "tekst": p_tekst.strip(),
+                "ikon": p_ikon,
+                "til": p_til,
+                "pakket": False
+            })
+            lagre_naa()
+            st.rerun()
+
+    st.write("")
+
+    # VISNING GRUPPERT ETTER HVEM SIN SEKK
+    grupper = ["Felles"] + [m for m in medlemmer if m != "Felles"]
+    pakkeliste_oppdatert = False
+    slett_pakk_id = None
+
+    if not pakkeliste:
+        st.info("Pakkelisten er tom! Velg en mal ovenfor eller legg til ting du vil ha med på tur.")
+    else:
+        tot_antall = len(pakkeliste)
+        tot_pakket = len([p for p in pakkeliste if p.get("pakket", False)])
+        total_framgang = tot_pakket / max(1, tot_antall)
+
+        st.markdown(f"**Totalt pakket:** `{tot_pakket} / {tot_antall}` ting er i sekkene ({int(total_framgang * 100)}%)")
+        st.progress(total_framgang)
+        if tot_pakket == tot_antall and tot_antall > 0:
+            st.balloons()
+            st.success("🎉 Alt er pakket og klart! God tur!")
+
+        st.write("")
+
+        for grp in grupper:
+            varer_i_grp = [p for p in pakkeliste if p.get("til", "Felles") == grp]
+            if varer_i_grp:
+                prof = hent_profil(grp, medlemmer)
+                grp_pakket = len([p for p in varer_i_grp if p.get("pakket", False)])
+                grp_tot = len(varer_i_grp)
+                
+                with st.expander(f"{prof['ikon']} **{grp} sin sekk** ({grp_pakket}/{grp_tot})", expanded=(grp_pakket < grp_tot)):
+                    for itm in varer_i_grp:
+                        itm_id = itm["id"]
+                        er_p = itm.get("pakket", False)
+                        
+                        col_chk, col_slett = st.columns([0.88, 0.12])
+                        with col_chk:
+                            etikett = f"~~{itm['ikon']} {itm['tekst']}~~" if er_p else f"**{itm['ikon']} {itm['tekst']}**"
+                            ny_status = st.checkbox(etikett, value=er_p, key=f"chk_p_{itm_id}")
+                            if ny_status != er_p:
+                                itm["pakket"] = ny_status
+                                pakkeliste_oppdatert = True
+                        with col_slett:
+                            if st.button("✕", key=f"del_p_{itm_id}", help="Fjern fra pakkelisten"):
+                                slett_pakk_id = itm_id
+
+        if pakkeliste_oppdatert:
+            lagre_naa()
+            st.rerun()
+
+        if slett_pakk_id:
+            data["pakkeliste"] = [x for x in data["pakkeliste"] if x["id"] != slett_pakk_id]
+            lagre_naa()
+            st.rerun()
+
+        st.divider()
+        col_pk1, col_pk2 = st.columns(2)
+        with col_pk1:
+            if st.button("🔄 Nullstill avkryssing (Klar til ny tur)", use_container_width=True):
+                for p in data["pakkeliste"]:
+                    p["pakket"] = False
+                lagre_naa()
+                st.toast("Avkryssinger nullstilt!")
+                st.rerun()
+        with col_pk2:
+            if st.button("🗑️ Tøm hele pakkelisten", use_container_width=True):
+                data["pakkeliste"] = []
+                lagre_naa()
+                st.toast("Pakkelisten er tømt!")
+                st.rerun()
+
+# ----------------- FANE 7: AKTIVITETER -----------------
 with fane_aktiviteter:
     st.subheader("🎲 Hva skal vi finne på?")
     st.caption("Trykk på knappen for å trekke en morsom idé til hva familien kan gjøre sammen!")
@@ -1831,7 +1988,7 @@ with fane_aktiviteter:
                     lagre_naa()
                     st.rerun()
 
-# ----------------- FANE 7: ADMIN -----------------
+# ----------------- FANE 8: ADMIN -----------------
 if er_forelder and fane_familie:
     with fane_familie:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
