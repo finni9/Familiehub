@@ -1290,10 +1290,9 @@ if "oppgaver" in fane_map:
                         st.toast("Oppgave lagret!")
                         st.rerun()
 
-# ----------------- FANE: BUTIKK & SPAREMÅL (INKL. FELLES SPAREMÅL) -----------------
+# ----------------- FANE: BUTIKK & SPAREMÅL -----------------
 if "butikk" in fane_map:
     with fane_map["butikk"]:
-        # FELLES FAMILIEMÅL
         st.subheader("🏆 Felles Familiemål")
         st.caption("Her kan hele familien spare sammen mot en felles opplevelse!")
         felles_m = data.get("felles_sparemaal", {"tittel": "Tur til Badeland 🏊", "pris": 60, "spart": 0})
@@ -1360,7 +1359,6 @@ if "butikk" in fane_map:
 
         st.write("---")
 
-        # INDIVIDUELLE SPAREMÅL
         st.subheader("🎯 Barnas Individuelle Sparemål")
         if stjerne_brukere:
             for p in stjerne_brukere:
@@ -1486,9 +1484,9 @@ if "butikk" in fane_map:
                     st.toast(f"🎉 Gratulerer {hvem_kjoper}!")
                     st.rerun()
 
-            if er_forelder and st.button("Slett premie ✕", key=f"del_bel_{bel['id']}"):
-                slett_belonning_id = bel["id"]
-            st.divider()
+        if er_forelder and st.button("Slett premie ✕", key=f"del_bel_{bel['id']}"):
+            slett_belonning_id = bel["id"]
+        st.divider()
 
         if slett_belonning_id:
             data["belonninger"] = [b for b in data["belonninger"] if b["id"] != slett_belonning_id]
@@ -2094,7 +2092,6 @@ if "garderobe" in fane_map:
         medlemmer = data.get("medlemmer", [])
         stjerne_brukere = data.get("stjerne_brukere", [])
         garderobe = data.get("garderobe", {})
-        garderobe_oppdatert = False
 
         if not stjerne_brukere:
             st.info("Ingen personer er satt opp som barn / stjernebrukere enda. Du kan definere dette under Admin.")
