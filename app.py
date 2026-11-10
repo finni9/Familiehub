@@ -1333,10 +1333,10 @@ if "butikk" in fane_map:
             with col_f_hvem:
                 giver = st.selectbox("Hvem bidrar?", stjerne_brukere, key="giver_felles", label_visibility="collapsed")
             with col_f_antall:
-                giver_saldo = data["poeng"].get(giver, 0)
+                giver_saldo = data["poeng"].get(giver, 0) if giver else 0
                 antall_gi = st.number_input("Antall ⭐", min_value=1, max_value=max(1, giver_saldo), value=min(giver_saldo, 1) if giver_saldo > 0 else 1, key="num_felles", label_visibility="collapsed")
             with col_f_btn:
-                kan_gi = giver_saldo >= antall_gi and giver_saldo > 0
+                kan_gi = giver and giver_saldo >= antall_gi and giver_saldo > 0
                 if st.button("Putt i krukka 🍯", disabled=not kan_gi, use_container_width=True, key="btn_gi_felles"):
                     data["poeng"][giver] -= antall_gi
                     felles_m["spart"] = f_spart + antall_gi
@@ -1360,6 +1360,7 @@ if "butikk" in fane_map:
         st.write("---")
 
         st.subheader("🎯 Barnas Individuelle Sparemål")
+        stjerne_brukere = data.get("stjerne_brukere", [])
         if stjerne_brukere:
             for p in stjerne_brukere:
                 saldo = data["poeng"].get(p, 0)
@@ -1475,7 +1476,7 @@ if "butikk" in fane_map:
             with c_k1:
                 hvem_kjoper = st.selectbox("Kjøper:", stjerne_brukere, key=f"b_who_{bel['id']}", label_visibility="collapsed")
             with c_k2:
-                har_rad = data["poeng"].get(hvem_kjoper, 0) >= bel["pris"]
+                har_rad = data["poeng"].get(hvem_kjoper, 0) >= bel["pris"] if hvem_kjoper else False
                 if st.button("Løs inn 🎉", key=f"btn_kjop_{bel['id']}", disabled=not har_rad, use_container_width=True):
                     data["poeng"][hvem_kjoper] -= bel["pris"]
                     logg_stjerne_hendelse(hvem_kjoper, "brukt", bel["pris"], bel["tittel"])
@@ -1484,9 +1485,9 @@ if "butikk" in fane_map:
                     st.toast(f"🎉 Gratulerer {hvem_kjoper}!")
                     st.rerun()
 
-        if er_forelder and st.button("Slett premie ✕", key=f"del_bel_{bel['id']}"):
-            slett_belonning_id = bel["id"]
-        st.divider()
+            if er_forelder and st.button("Slett premie ✕", key=f"del_bel_{bel['id']}"):
+                slett_belonning_id = bel["id"]
+            st.divider()
 
         if slett_belonning_id:
             data["belonninger"] = [b for b in data["belonninger"] if b["id"] != slett_belonning_id]
@@ -1718,14 +1719,14 @@ if "middag" in fane_map:
                         c_dag_navn, c_spist = st.columns([0.62, 0.38])
                         with c_dag_navn:
                             st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
-                    with c_spist:
-                        if st.button("🍽️ Spist", key=f"spist_btn_{dag}", help="Marker som spist og stryk fra fryser/matskap", use_container_width=True):
-                            slettet, slettet_navn = slett_vare_fra_fryser_ved_navn(valgt_rett)
-                            if slettet:
-                                st.balloons()
-                                st.toast(f"🎉 '{slettet_navn}' er nå strøket fra fryser/matskap!")
-                            else:
-                                st.toast(f"Middagen for {dag} er spist! 🍽️")
+                        with c_spist:
+                            if st.button("🍽️ Spist", key=f"spist_btn_{dag}", help="Marker som spist og stryk fra fryser/matskap", use_container_width=True):
+                                slettet, slettet_navn = slett_vare_fra_fryser_ved_navn(valgt_rett)
+                                if slettet:
+                                    st.balloons()
+                                    st.toast(f"🎉 '{slettet_navn}' er nå strøket fra fryser/matskap!")
+                                else:
+                                    st.toast(f"Middagen for {dag} er spist! 🍽️")
                     else:
                         st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 2px;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
 
