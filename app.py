@@ -115,6 +115,16 @@ KATEGORI_REGLER = {
         "melk", "ost", "rømme", "smør", "fløte", "yoghurt", "egg", "kesam", 
         "parmesan", "margarin", "majones", "leverpostei", "kaviar", "cottage cheese"
     ],
+    "🥤 Drikkevarer": [
+        "brus", "pepsi", "cola", "solo", "fanta", "sprite", "juice", "saft", 
+        "farris", "bonaqua", "iste", "energidrikk", "redbull", "vann", "sjokolademelk", 
+        "eplejuice", "appelsinjuice", "smoothie", "øl", "cider"
+    ],
+    "🍬 Godteri & Lørdagsgodt": [
+        "godteri", "godt", "smågodt", "snop", "sjokolade", "chips", "potetgull", 
+        "popcorn", "kjeks", "drops", "lakris", "seigmenn", "vingummi", "cheez doodle", 
+        "sjokoladepose", "bamsemums", "freia", "nidar", "pastiller", "tyggegummi"
+    ],
     "🍞 Tørrvare, Krydder & Kolonial": [
         "tacokrydder", "tortilla", "lefse", "spagetti", "pasta", "makaroni", 
         "pizzadeig", "pizzasaus", "salsa", "woksaus", "brun saus", "hvit saus", 
@@ -128,6 +138,8 @@ AVDELINGER = [
     "🥩 Kjøtt, Fisk & Fjærkre",
     "🧀 Meieri & Kjølevare",
     "🍞 Tørrvare, Krydder & Kolonial",
+    "🥤 Drikkevarer",
+    "🍬 Godteri & Lørdagsgodt",
     "📦 Annet / Diverse"
 ]
 
@@ -1738,7 +1750,7 @@ with fane_middag:
                         st.toast(f"{ny_r.strip()} er lagt til!")
                         st.rerun()
 
-# ----------------- FANE 5: HANDLELISTE -----------------
+# ----------------- FANE 5: HANDLELISTE (MED DRIKKEVARER & GODTERI) -----------------
 with fane_handleliste:
     st.subheader("🛒 Handleliste")
 
@@ -1767,8 +1779,8 @@ with fane_handleliste:
 
     with st.form("form_ny_vare", clear_on_submit=True):
         col_v, col_m = st.columns([0.65, 0.35])
-        ny_v = col_v.text_input("Vare:", placeholder="f.eks. Kjøttdeig, Epler")
-        ny_mengde = col_m.text_input("Mengde:", placeholder="f.eks. 2 pk, 1L")
+        ny_v = col_v.text_input("Vare:", placeholder="f.eks. Pepsi Max, Melkesjokolade, Epler")
+        ny_mengde = col_m.text_input("Mengde:", placeholder="f.eks. 4 pk, 1.5L, 2 poser")
         ny_kat = st.selectbox("Avdeling:", ["✨ Automatisk"] + AVDELINGER)
         
         if st.form_submit_button("Legg til vare", use_container_width=True) and ny_v.strip():
@@ -1819,7 +1831,7 @@ with fane_handleliste:
             lagre_naa()
             st.rerun()
 
-# ----------------- FANE 6: PAKKELISTE (FOR UTFLUKTER & TURER) -----------------
+# ----------------- FANE 6: PAKKELISTE -----------------
 with fane_pakkeliste:
     st.subheader("🧳 Smart Pakkeliste for tur & utflukter")
     st.caption("Gjør pakkingen til en lek! Barna kan krysse av tingene sine selv.")
@@ -1827,7 +1839,6 @@ with fane_pakkeliste:
     pakkeliste = data.get("pakkeliste", [])
     medlemmer = data.get("medlemmer", ["Far", "Mor", "Barn 1", "Barn 2"])
 
-    # HURTIGMALER
     with st.expander("⚡ **Hent inn en ferdig tur-pakkeliste**", expanded=(len(pakkeliste) == 0)):
         st.write("Velg en mal for å fylle listen automatisk:")
         col_m1, col_m2 = st.columns([0.65, 0.35])
@@ -1850,7 +1861,6 @@ with fane_pakkeliste:
 
     st.write("---")
 
-    # NYTT ELEMENT
     with st.form("form_ny_pakke_ting", clear_on_submit=True):
         col_pi_tekst, col_pi_ikon, col_pi_til, col_pi_btn = st.columns([0.45, 0.20, 0.20, 0.15])
         p_tekst = col_pi_tekst.text_input("Hva skal pakkes?", placeholder="f.eks. Regnvotter, Hodelykt")
@@ -1870,7 +1880,6 @@ with fane_pakkeliste:
 
     st.write("")
 
-    # VISNING GRUPPERT ETTER HVEM SIN SEKK
     grupper = ["Felles"] + [m for m in medlemmer if m != "Felles"]
     pakkeliste_oppdatert = False
     slett_pakk_id = None
