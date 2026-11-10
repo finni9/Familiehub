@@ -1612,9 +1612,10 @@ if "statistikk" in fane_map:
         else:
             st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE: MIDDAG & FRYSER -----------------
+# ----------------- FANE: MIDDAG & FRYSER (MED HURTIGVERKTØY FLYTTET NEDERST) -----------------
 if "middag" in fane_map:
     with fane_map["middag"]:
+        # 1. FRYSER OG MATSKAP
         with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
             fryser_data = data.get("fryser", [])
             varer_fryser = [v for v in fryser_data if v.get("plassering", "fryser") == "fryser"]
@@ -1677,25 +1678,8 @@ if "middag" in fane_map:
         st.write("---")
         oppskrifter = data.get("oppskrifter", STANDARD_MIDDAGER)
         oppskriftsliste = sorted(list(oppskrifter.keys()))
-
-        c_m1, c_m2, c_m3 = st.columns(3)
-        with c_m1:
-            st.button("✨ Auto-planlegg uken", on_click=cb_auto_planlegg, args=(oppskriftsliste,), use_container_width=True)
-        with c_m2:
-            st.button("🧊 Planlegg fra fryseren", on_click=cb_planlegg_fra_fryser, args=(oppskrifter, data.get("fryser", [])), use_container_width=True)
-        with c_m3:
-            if st.button("🛒 Til handleliste", use_container_width=True):
-                lagt = 0
-                for d in DAGER:
-                    rett = st.session_state.get(f"rett_{d}", "").strip()
-                    if rett in oppskrifter:
-                        for i_navn in oppskrifter[rett].get("ingredienser", []):
-                            if legg_til_vare_i_data(i_navn): lagt += 1
-                lagre_naa()
-                st.toast(f"{lagt} ingredienser lagt i handlelisten! 🛒")
-
-        st.write("---")
         
+        # 2. UKENS MIDDAGSPLAN
         st.markdown("#### 📅 Ukens Middagsplan")
         
         dag_rader = [
@@ -1773,6 +1757,7 @@ if "middag" in fane_map:
 
         st.write("---")
 
+        # 3. FAMILIENS BILDEKOKEBOK
         with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
             slett_oppskrift = None
             oppskrift_nokler = sorted(list(oppskrifter.keys()))
@@ -1884,6 +1869,27 @@ if "middag" in fane_map:
                         if lagre_naa():
                             st.toast(f"{ny_r.strip()} er lagt til!")
                             st.rerun()
+
+        st.write("---")
+
+        # 4. HURTIGVERKTØY FLYTTET NEDERST I EGEN BESKYTTET BOKS
+        with st.expander("🛠️ **Hurtigverktøy for ukemenyen (Auto-planlegg & felles innkjøp)**", expanded=False):
+            st.caption("Her kan du fylle ut hele ukemenyen automatisk eller sende alle ukens ingredienser til handlelisten samtidig.")
+            c_m1, c_m2, c_m3 = st.columns(3)
+            with c_m1:
+                st.button("✨ Auto-planlegg uken", on_click=cb_auto_planlegg, args=(oppskriftsliste,), use_container_width=True)
+            with c_m2:
+                st.button("🧊 Planlegg fra fryseren", on_click=cb_planlegg_fra_fryser, args=(oppskrifter, data.get("fryser", [])), use_container_width=True)
+            with c_m3:
+                if st.button("🛒 Hele uken til handleliste", use_container_width=True):
+                    lagt = 0
+                    for d in DAGER:
+                        rett = st.session_state.get(f"rett_{d}", "").strip()
+                        if rett in oppskrifter:
+                            for i_navn in oppskrifter[rett].get("ingredienser", []):
+                                if legg_til_vare_i_data(i_navn): lagt += 1
+                    lagre_naa()
+                    st.toast(f"{lagt} ingredienser lagt i handlelisten! 🛒")
 
 # ----------------- FANE: HANDLELISTE -----------------
 if "handleliste" in fane_map:
