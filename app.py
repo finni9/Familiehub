@@ -317,6 +317,7 @@ STANDARD_MODULER = {
     "middag": True,
     "handleliste": True,
     "pakkeliste": True,
+    "garderobe": True,
     "aktiviteter": True
 }
 
@@ -335,6 +336,12 @@ def standard_data(valgt_pin="1234"):
             "Barn 2": {"ikon": "🐰", "farge": "Gul/Brun"}
         },
         "moduler": STANDARD_MODULER,
+        "felles_sparemaal": {
+            "tittel": "Tur til Badeland 🏊",
+            "pris": 60,
+            "spart": 0
+        },
+        "garderobe": {},
         "poeng": {"Far": 0, "Mor": 0, "Barn 1": 0, "Barn 2": 0},
         "sparemaal": {},
         "pakkeliste": [],
@@ -524,14 +531,17 @@ if not raw_data:
 if "merkedager" not in raw_data: raw_data["merkedager"] = []
 if "oppskrifter" not in raw_data: raw_data["oppskrifter"] = STANDARD_MIDDAGER
 else: raw_data["oppskrifter"] = migrer_oppskrifter(raw_data["oppskrifter"])
-if "basisvarer" not in raw_data: raw_data["basisvarer"] = STANDARD_BASISVARER
+if "basisvarer" not in raw_data: raw_data["basisvarer"] = list(STANDARD_BASISVARER)
 if "sparemaal" not in raw_data: raw_data["sparemaal"] = {}
 if "pakkeliste" not in raw_data: raw_data["pakkeliste"] = []
+if "garderobe" not in raw_data: raw_data["garderobe"] = {}
 if "aktiviteter" not in raw_data: raw_data["aktiviteter"] = STANDARD_AKTIVITETER
 if "uke_oppgaver_lost" not in raw_data: raw_data["uke_oppgaver_lost"] = 0
 if "stjerne_logg" not in raw_data: raw_data["stjerne_logg"] = []
 if "person_profiler" not in raw_data: raw_data["person_profiler"] = {}
 if "moduler" not in raw_data: raw_data["moduler"] = dict(STANDARD_MODULER)
+if "felles_sparemaal" not in raw_data or not isinstance(raw_data["felles_sparemaal"], dict):
+    raw_data["felles_sparemaal"] = {"tittel": "Tur til Badeland 🏊", "pris": 60, "spart": 0}
 
 for mod_k, mod_v in STANDARD_MODULER.items():
     if mod_k not in raw_data["moduler"]:
@@ -969,7 +979,7 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
 er_forelder = st.session_state["foreldremodus"]
 moduler = data.get("moduler", STANDARD_MODULER)
 
-# ----------------- DYNAMISKE FANER BASERT PÅ AKTIVERTE MODULER -----------------
+# ----------------- DYNAMISKE FANER -----------------
 faner_konfig = []
 if moduler.get("oppgaver", True): faner_konfig.append(("oppgaver", "⭐ Oppgaver"))
 if moduler.get("butikk", True): faner_konfig.append(("butikk", "🎁 Butikk & Mål"))
@@ -977,6 +987,7 @@ if moduler.get("statistikk", True): faner_konfig.append(("statistikk", "📊 Stj
 if moduler.get("middag", True): faner_konfig.append(("middag", "🍽️ Middag & Fryser"))
 if moduler.get("handleliste", True): faner_konfig.append(("handleliste", "🛒 Handleliste"))
 if moduler.get("pakkeliste", True): faner_konfig.append(("pakkeliste", "🧳 Pakkeliste"))
+if moduler.get("garderobe", True): faner_konfig.append(("garderobe", "👟 Garderobe"))
 if moduler.get("aktiviteter", True): faner_konfig.append(("aktiviteter", "🎲 Aktiviteter"))
 if er_forelder: faner_konfig.append(("admin", "👨‍👩‍👧‍👦 Admin"))
 
@@ -1216,7 +1227,7 @@ if "oppgaver" in fane_map:
                                 <span style="font-size: 1.4rem; margin-right: 6px;">{ikon}</span> {oppg['tekst']}
                             </span>
                             <span style="font-size: 0.85rem; font-weight: 700; color: #FCD34D; margin-left: 8px;">
-                                (+{tot_stjerner} ⭐ deles)
+                            (+{tot_stjerner} ⭐ deles)
                             </span>
                         </div>
                         """,
@@ -1279,13 +1290,78 @@ if "oppgaver" in fane_map:
                         st.toast("Oppgave lagret!")
                         st.rerun()
 
-# ----------------- FANE: BUTIKK & SPAREMÅL -----------------
+# ----------------- FANE: BUTIKK & SPAREMÅL (INKL. FELLES SPAREMÅL) -----------------
 if "butikk" in fane_map:
     with fane_map["butikk"]:
-        st.subheader("🎯 Barnas Sparemål")
-        st.caption("Her kan barna spare målrettet ved å overføre stjerner rett inn i sparebøssa!")
-        stjerne_brukere = data.get("stjerne_brukere", [])
+        # FELLES FAMILIEMÅL
+        st.subheader("🏆 Felles Familiemål")
+        st.caption("Her kan hele familien spare sammen mot en felles opplevelse!")
+        felles_m = data.get("felles_sparemaal", {"tittel": "Tur til Badeland 🏊", "pris": 60, "spart": 0})
+        f_tittel = felles_m.get("tittel", "Felles mål")
+        f_pris = max(1, int(felles_m.get("pris", 60)))
+        f_spart = int(felles_m.get("spart", 0))
+        f_framgang = min(1.0, f_spart / f_pris)
+        f_prosent = int(f_framgang * 100)
 
+        st.markdown(
+            f"""
+            <div style="background: linear-gradient(135deg, #065F46 0%, #047857 100%); border: 2px solid #34D399; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 900; font-size: 1.15rem; color: #FFFFFF;">
+                        🌟 {f_tittel}
+                    </span>
+                    <span style="font-weight: 900; font-size: 1.1rem; color: #FCD34D;">
+                        {f_spart} / {f_pris} ⭐ ({f_prosent}%)
+                    </span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        st.progress(f_framgang)
+
+        if f_spart >= f_pris:
+            st.balloons()
+            st.success(f"🎉 Gratulerer hele familien! Dere har nådd fellesmålet: {f_tittel}!")
+            if er_forelder and st.button("Nullstill / Sett nytt fellesmål 🔄", key="reset_felles_m"):
+                felles_m["spart"] = 0
+                lagre_naa()
+                st.rerun()
+        else:
+            st.write("Overfør stjerner fra en person til felleskrukka:")
+            col_f_hvem, col_f_antall, col_f_btn = st.columns([0.45, 0.25, 0.30])
+            stjerne_brukere = data.get("stjerne_brukere", [])
+            with col_f_hvem:
+                giver = st.selectbox("Hvem bidrar?", stjerne_brukere, key="giver_felles", label_visibility="collapsed")
+            with col_f_antall:
+                giver_saldo = data["poeng"].get(giver, 0)
+                antall_gi = st.number_input("Antall ⭐", min_value=1, max_value=max(1, giver_saldo), value=min(giver_saldo, 1) if giver_saldo > 0 else 1, key="num_felles", label_visibility="collapsed")
+            with col_f_btn:
+                kan_gi = giver_saldo >= antall_gi and giver_saldo > 0
+                if st.button("Putt i krukka 🍯", disabled=not kan_gi, use_container_width=True, key="btn_gi_felles"):
+                    data["poeng"][giver] -= antall_gi
+                    felles_m["spart"] = f_spart + antall_gi
+                    logg_stjerne_hendelse(giver, "brukt", antall_gi, f"Bidro til fellesmål ({f_tittel})")
+                    lagre_naa()
+                    st.toast(f"{giver} la {antall_gi} ⭐ i felleskrukka! 👏")
+                    st.rerun()
+
+        if er_forelder:
+            with st.expander("⚙️ Endre fellesmålet (PIN-opplåst)"):
+                with st.form("form_endre_fellesm"):
+                    ny_f_tittel = st.text_input("Hva er fellesmålet?", value=f_tittel)
+                    ny_f_pris = st.number_input("Målkrav i stjerner:", min_value=10, max_value=500, value=f_pris)
+                    if st.form_submit_button("Oppdater fellesmål"):
+                        felles_m["tittel"] = ny_f_tittel.strip()
+                        felles_m["pris"] = int(ny_f_pris)
+                        lagre_naa()
+                        st.toast("Fellesmålet er oppdatert!")
+                        st.rerun()
+
+        st.write("---")
+
+        # INDIVIDUELLE SPAREMÅL
+        st.subheader("🎯 Barnas Individuelle Sparemål")
         if stjerne_brukere:
             for p in stjerne_brukere:
                 saldo = data["poeng"].get(p, 0)
@@ -1644,14 +1720,14 @@ if "middag" in fane_map:
                         c_dag_navn, c_spist = st.columns([0.62, 0.38])
                         with c_dag_navn:
                             st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
-                        with c_spist:
-                            if st.button("🍽️ Spist", key=f"spist_btn_{dag}", help="Marker som spist og stryk fra fryser/matskap", use_container_width=True):
-                                slettet, slettet_navn = slett_vare_fra_fryser_ved_navn(valgt_rett)
-                                if slettet:
-                                    st.balloons()
-                                    st.toast(f"🎉 '{slettet_navn}' er nå strøket fra fryser/matskap!")
-                                else:
-                                    st.toast(f"Middagen for {dag} er spist! 🍽️")
+                    with c_spist:
+                        if st.button("🍽️ Spist", key=f"spist_btn_{dag}", help="Marker som spist og stryk fra fryser/matskap", use_container_width=True):
+                            slettet, slettet_navn = slett_vare_fra_fryser_ved_navn(valgt_rett)
+                            if slettet:
+                                st.balloons()
+                                st.toast(f"🎉 '{slettet_navn}' er nå strøket fra fryser/matskap!")
+                            else:
+                                st.toast(f"Middagen for {dag} er spist! 🍽️")
                     else:
                         st.markdown(f"<div style='padding-top: 4px; font-weight: 800; font-size: 0.95rem; color: #FFFFFF; margin-bottom: 2px;'>{dag}{badge_idag}</div>", unsafe_allow_html=True)
 
@@ -1817,7 +1893,7 @@ if "handleliste" in fane_map:
 
         basisvarer = data.get("basisvarer", STANDARD_BASISVARER)
         if basisvarer:
-            st.caption("⚡ **Hurtigknapper for basisvarer:**")
+            st.caption("⚡ **Hurtigknapper for basisvarer (inkl. brus & godteri):**")
             kol_per_rad = 3
             for start_idx in range(0, len(basisvarer), kol_per_rad):
                 rad_varer = basisvarer[start_idx:start_idx + kol_per_rad]
@@ -2009,6 +2085,66 @@ if "pakkeliste" in fane_map:
                     st.toast("Pakkelisten er tømt!")
                     st.rerun()
 
+# ----------------- FANE: GARDEROBE & KLESSTØRRELSER -----------------
+if "garderobe" in fane_map:
+    with fane_map["garderobe"]:
+        st.subheader("👟 Barnas Garderobe & Klesstørrelser")
+        st.caption("Aldri mer usikker i klesbutikken! Sjekk størrelser og hva som mangler i skuffen eller barnehagen.")
+
+        medlemmer = data.get("medlemmer", [])
+        stjerne_brukere = data.get("stjerne_brukere", [])
+        garderobe = data.get("garderobe", {})
+        garderobe_oppdatert = False
+
+        if not stjerne_brukere:
+            st.info("Ingen personer er satt opp som barn / stjernebrukere enda. Du kan definere dette under Admin.")
+        else:
+            for b_navn in stjerne_brukere:
+                prof = hent_profil(b_navn, data)
+                b_info = garderobe.get(b_navn, {
+                    "sko": "28",
+                    "klaer": "110/116",
+                    "lue": "52",
+                    "mangler": "Ekstra ullsokker, regnvotter"
+                })
+
+                with st.expander(f"{prof['ikon']} **{b_navn} sin garderobe**", expanded=True):
+                    c_sko, c_klaer, c_lue = st.columns(3)
+                    ny_sko = c_sko.text_input("Skostørrelse:", value=b_info.get("sko", ""), key=f"g_sko_{b_navn}")
+                    ny_klaer = c_klaer.text_input("Klesstørrelse:", value=b_info.get("klaer", ""), key=f"g_klaer_{b_navn}")
+                    ny_lue = c_lue.text_input("Luestr. / Hodeomkrets:", value=b_info.get("lue", ""), key=f"g_lue_{b_navn}")
+
+                    ny_mangler = st.text_area(
+                        "🎒 Mangler i kurven (barnehage/skole):",
+                        value=b_info.get("mangler", ""),
+                        key=f"g_mangler_{b_navn}",
+                        placeholder="f.eks. Regnvotter, ekstra skift, gummistøvler..."
+                    )
+
+                    c_g_lagre, c_g_handle = st.columns([0.65, 0.35])
+                    with c_g_lagre:
+                        if st.button("Lagre størrelser 💾", key=f"btn_lagre_g_{b_navn}", use_container_width=True):
+                            garderobe[b_navn] = {
+                                "sko": ny_sko.strip(),
+                                "klaer": ny_klaer.strip(),
+                                "lue": ny_lue.strip(),
+                                "mangler": ny_mangler.strip()
+                            }
+                            data["garderobe"] = garderobe
+                            lagre_naa()
+                            st.toast(f"Garderoben til {b_navn} er oppdatert!")
+                            st.rerun()
+
+                    with c_g_handle:
+                        if ny_mangler.strip() and st.button("🛒 Send mangler til handleliste", key=f"btn_g_hl_{b_navn}", use_container_width=True):
+                            ting_liste = [t.strip() for t in ny_mangler.replace("\n", ",").split(",") if t.strip()]
+                            lagt_til = 0
+                            for t in ting_liste:
+                                if legg_til_vare_i_data(f"{t} ({b_navn})", "", "📦 Annet / Diverse"):
+                                    lagt_til += 1
+                            lagre_naa()
+                            st.toast(f"Lagt til {lagt_til} ting i handlelisten!")
+
 # ----------------- FANE: AKTIVITETER -----------------
 if "aktiviteter" in fane_map:
     with fane_map["aktiviteter"]:
@@ -2060,12 +2196,11 @@ if "aktiviteter" in fane_map:
                         lagre_naa()
                         st.rerun()
 
-# ----------------- FANE: ADMIN (MED MODULSTYRING OG AVATARVALG) -----------------
+# ----------------- FANE: ADMIN -----------------
 if "admin" in fane_map:
     with fane_map["admin"]:
         st.subheader("👨‍👩‍👧‍👦 Familieadministrasjon")
 
-        # 1. MODULSTYRING
         with st.expander("🎛️ **Tilpass familiens moduler (Skjul/Vis funksjoner)**", expanded=False):
             st.caption("Slå av funksjoner dere ikke bruker for en renere app (f.eks. for par uten barn):")
             mod_oppg = st.checkbox("⭐ Oppgaver & Rutiner", value=moduler.get("oppgaver", True), key="mod_chk_oppg")
@@ -2074,6 +2209,7 @@ if "admin" in fane_map:
             mod_mid = st.checkbox("🍽️ Middagsplan & Fryser/Matskap", value=moduler.get("middag", True), key="mod_chk_mid")
             mod_han = st.checkbox("🛒 Handleliste", value=moduler.get("handleliste", True), key="mod_chk_han")
             mod_pak = st.checkbox("🧳 Smart Pakkeliste", value=moduler.get("pakkeliste", True), key="mod_chk_pak")
+            mod_gard = st.checkbox("👟 Garderobe & Klesstørrelser", value=moduler.get("garderobe", True), key="mod_chk_gard")
             mod_akt = st.checkbox("🎲 Aktiviteter", value=moduler.get("aktiviteter", True), key="mod_chk_akt")
 
             if st.button("Lagre modulvalg 💾", use_container_width=True):
@@ -2084,6 +2220,7 @@ if "admin" in fane_map:
                     "middag": mod_mid,
                     "handleliste": mod_han,
                     "pakkeliste": mod_pak,
+                    "garderobe": mod_gard,
                     "aktiviteter": mod_akt
                 }
                 lagre_naa()
@@ -2110,7 +2247,6 @@ if "admin" in fane_map:
 
         st.divider()
 
-        # 2. FAMILIEMEDLEMMER MED FRITT AVATAR- OG FARGEVALG
         st.markdown("#### 👤 Familiemedlemmer, Avatarer & Farger")
         if "person_profiler" not in data:
             data["person_profiler"] = {}
@@ -2125,7 +2261,6 @@ if "admin" in fane_map:
             
             nytt_navn = c_pnavn.text_input("Navn", value=person, key=f"adm_navn_{i}", label_visibility="collapsed")
             
-            # Finn indeks for figur
             fig_idx = 0
             for f_idx, fig_str in enumerate(MULIGE_FIGURER):
                 if aktiv_fig in fig_str:
@@ -2133,7 +2268,6 @@ if "admin" in fane_map:
                     break
             ny_valgt_fig = c_pikon.selectbox("Figur:", MULIGE_FIGURER, index=fig_idx, key=f"adm_fig_{i}", label_visibility="collapsed")
             
-            # Finn indeks for farge
             farge_navn_liste = list(FARGE_TEMALISTE.keys())
             farge_idx = farge_navn_liste.index(aktiv_farge) if aktiv_farge in farge_navn_liste else 0
             ny_valgt_farge = c_pfarge.selectbox("Farge:", farge_navn_liste, index=farge_idx, key=f"adm_farge_{i}", label_visibility="collapsed")
@@ -2206,7 +2340,6 @@ if "admin" in fane_map:
 
         st.divider()
 
-        # 3. HURTIGKNAPPER
         st.markdown("#### ⚡ Administrer Hurtigknapper for basisvarer")
         basisvarer = data.get("basisvarer", STANDARD_BASISVARER)
         slett_b_id = None
