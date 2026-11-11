@@ -192,19 +192,69 @@ def hent_profil(person, data_ref):
 
 st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
 
-skjul_streamlit_elementer = """
+# ----------------- OPPGRADERT CSS (PILLE-FANER & KOMPAKT LAYOUT) -----------------
+IKON_URL = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f3e1.png"
+
+skjul_streamlit_elementer = f"""
 <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden; display: none;}
-    [data-testid="stToolbar"] {visibility: hidden; display: none;}
-    [data-testid="stDecoration"] {visibility: hidden; display: none;}
-    [data-testid="stStatusWidget"] {visibility: hidden; display: none;}
-    [data-testid="manage-app-button"] {display: none !important;}
-    div[class*="viewerBadge"] {display: none !important;}
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden; display: none;}}
+    [data-testid="stToolbar"] {{visibility: hidden; display: none;}}
+    [data-testid="stDecoration"] {{visibility: hidden; display: none;}}
+    [data-testid="stStatusWidget"] {{visibility: hidden; display: none;}}
+    [data-testid="manage-app-button"] {{display: none !important;}}
+    div[class*="viewerBadge"] {{display: none !important;}}
+    
+    /* Mindre tomrom øverst på mobil og desktop */
+    .block-container {{
+        padding-top: 1.2rem !important;
+        padding-bottom: 2.5rem !important;
+    }}
+
+    /* Stilrene Pille-faner (Tabs) */
+    div[data-testid="stTabs"] button[data-baseweb="tab"] {{
+        background-color: #1E293B !important;
+        border-radius: 12px !important;
+        padding: 8px 14px !important;
+        margin-right: 6px !important;
+        border: 1.5px solid #334155 !important;
+        color: #CBD5E1 !important;
+        font-weight: 700 !important;
+        transition: all 0.2s ease-in-out !important;
+    }}
+    div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {{
+        background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%) !important;
+        color: #FFFFFF !important;
+        border: 1.5px solid #60A5FA !important;
+        box-shadow: 0 3px 8px rgba(59, 130, 246, 0.35) !important;
+    }}
+    div[data-testid="stTabs"] div[data-baseweb="tab-highlight"] {{
+        display: none !important;
+    }}
+
+    /* Mykere og mer moderne Expanders */
+    div[data-testid="stExpander"] {{
+        border-radius: 12px !important;
+        border: 1px solid #334155 !important;
+        background-color: #0F172A !important;
+        margin-bottom: 8px !important;
+    }}
+
+    /* Ekstra tydelige avkrysningsbokser */
+    div[data-testid="stCheckbox"] label {{
+        padding-top: 3px !important;
+        padding-bottom: 3px !important;
+        font-size: 1.02rem !important;
+    }}
 </style>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Familiehub">
 <meta name="theme-color" content="#FF6B6B">
+<link rel="apple-touch-icon" href="{IKON_URL}">
+<link rel="apple-touch-icon" sizes="180x180" href="{IKON_URL}">
+<link rel="icon" type="image/png" sizes="192x192" href="{IKON_URL}">
 """
 st.markdown(skjul_streamlit_elementer, unsafe_allow_html=True)
 
@@ -622,25 +672,44 @@ def cb_sett_middag(dag, rett):
     lagre_naa()
     st.session_state[f"rett_{dag}"] = rett
 
+# OPPGRADERT: FYLLER KUN TOMME DAGER
 def cb_auto_planlegg(oppskriftsliste):
     if not oppskriftsliste: return
-    if len(oppskriftsliste) >= 7: ukens_trekk = random.sample(oppskriftsliste, 7)
-    else: ukens_trekk = [random.choice(oppskriftsliste) for _ in range(7)]
-    for i, dag in enumerate(DAGER):
-        ny_rett = ukens_trekk[i]
+    tomme_dager = [d for d in DAGER if not st.session_state.get(f"rett_{d}", "").strip()]
+    if not tomme_dager:
+        return
+    allerede_valgt = [st.session_state.get(f"rett_{d}", "").strip() for d in DAGER if st.session_state.get(f"rett_{d}", "").strip()]
+    tilgjengelige = [r for r in oppskriftsliste if r not in allerede_valgt]
+    if not tilgjengelige:
+        tilgjengelige = list(oppskriftsliste)
+        
+    for dag in tomme_dager:
+        if tilgjengelige:
+            ny_rett = random.choice(tilgjengelige)
+            if len(tilgjengelige) > 1:
+                tilgjengelige.remove(ny_rett)
+        else:
+            ny_rett = random.choice(oppskriftsliste)
         data["middagsplan"][dag] = ny_rett
         st.session_state[f"rett_{dag}"] = ny_rett
     lagre_naa()
 
+# OPPGRADERT: FYLLER KUN TOMME DAGER FRA FRYSER
 def cb_planlegg_fra_fryser(oppskrifter, fryser_varer):
     if not oppskrifter:
         return
-    
+    tomme_dager = [d for d in DAGER if not st.session_state.get(f"rett_{d}", "").strip()]
+    if not tomme_dager:
+        return
+        
+    allerede_valgt = [st.session_state.get(f"rett_{d}", "").strip() for d in DAGER if st.session_state.get(f"rett_{d}", "").strip()]
     fryser_tekster = [f["navn"].lower() for f in fryser_varer]
     matcher = []
     andre_retter = []
     
     for rett_navn, info in oppskrifter.items():
+        if rett_navn in allerede_valgt:
+            continue
         ingredienser = [i.lower() for i in info.get("ingredienser", [])]
         matchet = False
         
@@ -659,16 +728,23 @@ def cb_planlegg_fra_fryser(oppskrifter, fryser_varer):
     random.shuffle(matcher)
     random.shuffle(andre_retter)
     
-    valgt_meny = (matcher + andre_retter)[:7]
-    while len(valgt_meny) < 7 and (matcher or andre_retter):
-        valgt_meny.append(random.choice(matcher + andre_retter))
-        
-    for i, dag in enumerate(DAGER):
-        if i < len(valgt_meny):
-            ny_rett = valgt_meny[i]
-            data["middagsplan"][dag] = ny_rett
-            st.session_state[f"rett_{dag}"] = ny_rett
+    kandidater = matcher + andre_retter
+    alle_oppskrifter = list(oppskrifter.keys())
+    
+    for dag in tomme_dager:
+        if kandidater:
+            ny_rett = kandidater.pop(0)
+        else:
+            ny_rett = random.choice(alle_oppskrifter)
+        data["middagsplan"][dag] = ny_rett
+        st.session_state[f"rett_{dag}"] = ny_rett
             
+    lagre_naa()
+
+def cb_tom_ukemeny():
+    for dag in DAGER:
+        data["middagsplan"][dag] = ""
+        st.session_state[f"rett_{dag}"] = ""
     lagre_naa()
 
 def slett_vare_fra_fryser_ved_navn(rett_eller_ingrediens):
@@ -763,6 +839,35 @@ with col_banner:
     </div>
     """
     st.markdown(banner_html, unsafe_allow_html=True)
+
+# ----------------- NYTT: «I DAG»-HURTIGKORT ØVERST -----------------
+dagens_middag_rett = data.get("middagsplan", {}).get(idag_navn, "").strip()
+middag_vis_tekst = f"<b>{dagens_middag_rett}</b>" if dagens_middag_rett else "<span style='color: #94A3B8;'>Ikke valgt enda</span>"
+
+dagens_kal_hendelser = [m for m in data.get("merkedager", []) if m.get("dato") == idag_str]
+if dagens_kal_hendelser:
+    kal_vis_tekst = ", ".join([f"<b>{h.get('ikon', '📌')} {h['tittel']}</b> ({h.get('hvem', 'Felles')})" for h in dagens_kal_hendelser])
+else:
+    kal_vis_tekst = "<span style='color: #94A3B8;'>Ingen faste planer</span>"
+
+moduler = data.get("moduler", STANDARD_MODULER)
+oppg_linje_html = ""
+if moduler.get("oppgaver", True):
+    ant_ugjort = len([o for o in data.get("oppgaver", []) if o.get("status") == "ugjort"])
+    ant_venter = len([o for o in data.get("oppgaver", []) if o.get("status") == "venter"])
+    venter_badge = f" &nbsp;•&nbsp; <span style='color: #FCD34D; font-weight: 800;'>🔔 {ant_venter} venter på sjekk!</span>" if ant_venter > 0 else ""
+    oppg_linje_html = f"<div style='margin-top: 4px; font-size: 0.84rem; color: #E2E8F0;'>⭐ <b>Oppgaver:</b> {ant_ugjort} ugjorte i dag{venter_badge}</div>"
+
+idag_kort_html = f"""
+<div style="background-color: #1E293B; border: 1.5px solid #334155; border-left: 5px solid #3B82F6; border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 0.88rem; color: #F8FAFC;">
+        <div>🍽️ <b>Middag i dag:</b> {middag_vis_tekst}</div>
+        <div>🗓️ <b>Skjer i dag:</b> {kal_vis_tekst}</div>
+    </div>
+    {oppg_linje_html}
+</div>
+"""
+st.markdown(idag_kort_html, unsafe_allow_html=True)
 
 # ----------------- KALENDER MED FULLT MÅNEDSRUTENETT (MAN-SØN) -----------------
 with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded=False):
@@ -904,37 +1009,38 @@ with st.expander("🗓️ **Familiens Månedskalender & Aktiviteter**", expanded
     else:
         st.caption("Ingen aktiviteter lagt inn.")
 
-    st.write("---")
-    with st.form("form_ny_merkedag", clear_on_submit=True):
-        st.markdown("##### ➕ Legg til aktivitet eller merkedag")
-        m_tittel = st.text_input("Hva skal skje?", placeholder="f.eks. Dans, Fotballtrening, Bursdag")
-        col_h, col_i = st.columns([0.6, 0.4])
-        m_hvem = col_h.selectbox("Hvem gjelder det?", medlemmer + [FELLES_VALG])
-        m_ikon = col_i.selectbox("Type:", ["🩰 Dans", "⚽ Sport/Fotball", "🎂 Bursdag", "🏊 Svømming", "🎒 Skole/SFO", "🦷 Tannlege/Lege", "✈️ Ferie/Tur", "📌 Annet"])
-        
-        m_dato_valg = st.date_input("Startdato:", min_value=idag_dato, value=idag_dato)
-        col_gjenta, col_uker = st.columns([0.55, 0.45])
-        m_gjenta = col_gjenta.checkbox("🔄 Gjenta ukentlig", value=False)
-        m_antall_uker = col_uker.number_input("Antall uker:", min_value=2, max_value=40, value=10, disabled=not m_gjenta)
-        
-        if st.form_submit_button("Lagre i kalenderen 🗓️", use_container_width=True) and m_tittel.strip():
-            antall_ganger = int(m_antall_uker) if m_gjenta else 1
-            for uke_nr in range(antall_ganger):
-                ny_dato = m_dato_valg + timedelta(weeks=uke_nr)
-                data["merkedager"].append({
-                    "id": str(uuid.uuid4()),
-                    "tittel": m_tittel.strip(),
-                    "dato": ny_dato.strftime("%Y-%m-%d"),
-                    "ikon": m_ikon.split()[0],
-                    "hvem": m_hvem
-                })
-            lagre_naa()
-            msg = f"Lagt til {m_tittel} i {antall_ganger} uker fremover!" if m_gjenta else f"Lagt til {m_tittel}!"
-            st.toast(msg)
-            st.rerun()
+    with st.expander("➕ **Legg til ny aktivitet eller merkedag**"):
+        with st.form("form_ny_merkedag", clear_on_submit=True):
+            m_tittel = st.text_input("Hva skal skje?", placeholder="f.eks. Dans, Fotballtrening, Bursdag")
+            col_h, col_i = st.columns([0.6, 0.4])
+            m_hvem = col_h.selectbox("Hvem gjelder det?", medlemmer + [FELLES_VALG])
+            m_ikon = col_i.selectbox("Type:", ["🩰 Dans", "⚽ Sport/Fotball", "🎂 Bursdag", "🏊 Svømming", "🎒 Skole/SFO", "🦷 Tannlege/Lege", "✈️ Ferie/Tur", "📌 Annet"])
+            
+            m_dato_valg = st.date_input("Startdato:", min_value=idag_dato, value=idag_dato)
+            col_gjenta, col_uker = st.columns([0.55, 0.45])
+            m_gjenta = col_gjenta.checkbox("🔄 Gjenta ukentlig", value=False)
+            m_antall_uker = col_uker.number_input("Antall uker:", min_value=2, max_value=40, value=10, disabled=not m_gjenta)
+            
+            if st.form_submit_button("Lagre i kalenderen 🗓️", use_container_width=True) and m_tittel.strip():
+                antall_ganger = int(m_antall_uker) if m_gjenta else 1
+                for uke_nr in range(antall_ganger):
+                    ny_dato = m_dato_valg + timedelta(weeks=uke_nr)
+                    data["merkedager"].append({
+                        "id": str(uuid.uuid4()),
+                        "tittel": m_tittel.strip(),
+                        "dato": ny_dato.strftime("%Y-%m-%d"),
+                        "ikon": m_ikon.split()[0],
+                        "hvem": m_hvem
+                    })
+                lagre_naa()
+                msg = f"Lagt til {m_tittel} i {antall_ganger} uker fremover!" if m_gjenta else f"Lagt til {m_tittel}!"
+                st.toast(msg)
+                st.rerun()
 
 # ----------------- OPPSLAGSTAVLE -----------------
-with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
+ant_beskjeder = len(data.get("beskjeder", []))
+oppslag_tittel = f"📌 **Familiens Oppslagstavle ({ant_beskjeder})**" if ant_beskjeder > 0 else "📌 **Familiens Oppslagstavle**"
+with st.expander(oppslag_tittel, expanded=False):
     beskjeder = data.get("beskjeder", [])
     slett_beskjed_id = None
     if beskjeder:
@@ -977,15 +1083,20 @@ with st.expander("📌 **Familiens Oppslagstavle**", expanded=False):
             st.rerun()
 
 er_forelder = st.session_state["foreldremodus"]
-moduler = data.get("moduler", STANDARD_MODULER)
 
-# ----------------- DYNAMISKE FANER -----------------
+# ----------------- DYNAMISKE FANER MED VARSEL-INDIKATOR -----------------
+antall_venter_oppg = len([o for o in data.get("oppgaver", []) if o.get("status") == "venter"])
+oppg_fane_navn = f"⭐ Oppgaver (🔔 {antall_venter_oppg})" if antall_venter_oppg > 0 else "⭐ Oppgaver"
+
+antall_ukjopte_varer = len([v for v in data.get("handleliste", []) if not v.get("kjopt", False)])
+hl_fane_navn = f"🛒 Handleliste ({antall_ukjopte_varer})" if antall_ukjopte_varer > 0 else "🛒 Handleliste"
+
 faner_konfig = []
-if moduler.get("oppgaver", True): faner_konfig.append(("oppgaver", "⭐ Oppgaver"))
+if moduler.get("oppgaver", True): faner_konfig.append(("oppgaver", oppg_fane_navn))
 if moduler.get("butikk", True): faner_konfig.append(("butikk", "🎁 Butikk & Mål"))
 if moduler.get("statistikk", True): faner_konfig.append(("statistikk", "📊 Stjernelogg"))
 if moduler.get("middag", True): faner_konfig.append(("middag", "🍽️ Middag & Fryser"))
-if moduler.get("handleliste", True): faner_konfig.append(("handleliste", "🛒 Handleliste"))
+if moduler.get("handleliste", True): faner_konfig.append(("handleliste", hl_fane_navn))
 if moduler.get("pakkeliste", True): faner_konfig.append(("pakkeliste", "🧳 Pakkeliste"))
 if moduler.get("garderobe", True): faner_konfig.append(("garderobe", "👟 Garderobe"))
 if moduler.get("aktiviteter", True): faner_konfig.append(("aktiviteter", "🎲 Aktiviteter"))
@@ -1097,24 +1208,6 @@ if "oppgaver" in fane_map:
                         """,
                         unsafe_allow_html=True
                     )
-
-        c_dag, c_uke = st.columns(2)
-        with c_dag:
-            if st.button("☀️ Nullstill rutiner (Manuell)", use_container_width=True):
-                for o in data["oppgaver"]:
-                    if o.get("gjentakende", False):
-                        o["status"] = "ugjort"
-                        o["fullfort_av"] = None
-                lagre_naa()
-                st.toast("Daglige rutiner er klare for en ny dag! ☀️")
-                st.rerun()
-        with c_uke:
-            if er_forelder:
-                st.button("🗓️ Start ny uke (Nullstill diplom)", on_click=cb_start_ny_uke, use_container_width=True)
-            else:
-                st.caption("🔒 Ny uke krever PIN")
-
-        st.write("")
 
         for person in medlemmer:
             prof = hent_profil(person, data)
@@ -1262,9 +1355,27 @@ if "oppgaver" in fane_map:
             lagre_naa()
             st.rerun()
 
-        if er_forelder:
-            st.write("---")
-            with st.expander("➕ **Legg til ny oppgave (for voksne)**"):
+        st.write("")
+        with st.expander("🛠️ **Administrer oppgaver & Nullstill rutiner**", expanded=False):
+            c_dag, c_uke = st.columns(2)
+            with c_dag:
+                if st.button("☀️ Nullstill daglige rutiner", use_container_width=True):
+                    for o in data["oppgaver"]:
+                        if o.get("gjentakende", False):
+                            o["status"] = "ugjort"
+                            o["fullfort_av"] = None
+                    lagre_naa()
+                    st.toast("Daglige rutiner er klare for en ny dag! ☀️")
+                    st.rerun()
+            with c_uke:
+                if er_forelder:
+                    st.button("🗓️ Start ny uke", on_click=cb_start_ny_uke, use_container_width=True)
+                else:
+                    st.caption("🔒 Ny uke krever foreldre-PIN")
+
+            if er_forelder:
+                st.write("---")
+                st.markdown("##### ➕ Legg til ny oppgave")
                 with st.form("form_ny_oppg", clear_on_submit=True):
                     col_t, col_ik = st.columns([0.75, 0.25])
                     oppg_tekst = col_t.text_input("Gjøremål:", placeholder="f.eks. Pusse tenner, Re opp sengen")
@@ -1612,7 +1723,7 @@ if "statistikk" in fane_map:
         else:
             st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE: MIDDAG & FRYSER (MED HURTIGVERKTØY FLYTTET NEDERST) -----------------
+# ----------------- FANE: MIDDAG & FRYSER -----------------
 if "middag" in fane_map:
     with fane_map["middag"]:
         # 1. FRYSER OG MATSKAP
@@ -1675,7 +1786,6 @@ if "middag" in fane_map:
                     lagre_naa()
                     st.rerun()
 
-        st.write("---")
         oppskrifter = data.get("oppskrifter", STANDARD_MIDDAGER)
         oppskriftsliste = sorted(list(oppskrifter.keys()))
         
@@ -1755,7 +1865,7 @@ if "middag" in fane_map:
         if plan_oppdatert: 
             lagre_naa()
 
-        st.write("---")
+        st.write("")
 
         # 3. FAMILIENS BILDEKOKEBOK
         with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
@@ -1862,7 +1972,7 @@ if "middag" in fane_map:
                     nytt_opp_bilde = col_nr2.file_uploader("Bilde (valgfritt):", type=["png", "jpg", "jpeg"])
                     ny_i = st.text_area("Ingredienser (komma mellom hver):", placeholder="Laksefilet, Poteter, Gulrøtter")
                     
-                    if st.form_submit_button("Lagre oppgave", use_container_width=True) and ny_r.strip():
+                    if st.form_submit_button("Lagre oppskrift", use_container_width=True) and ny_r.strip():
                         ingr_liste_ren = [x.strip() for x in ny_i.split(",") if x.strip()]
                         b64_str = bilde_til_base64(nytt_opp_bilde) if nytt_opp_bilde else None
                         data["oppskrifter"][ny_r.strip()] = {"ingredienser": ingr_liste_ren, "bilde": b64_str}
@@ -1870,16 +1980,16 @@ if "middag" in fane_map:
                             st.toast(f"{ny_r.strip()} er lagt til!")
                             st.rerun()
 
-        st.write("---")
-
-        # 4. HURTIGVERKTØY FLYTTET NEDERST I EGEN BESKYTTET BOKS
-        with st.expander("🛠️ **Hurtigverktøy for ukemenyen (Auto-planlegg & felles innkjøp)**", expanded=False):
-            st.caption("Her kan du fylle ut hele ukemenyen automatisk eller sende alle ukens ingredienser til handlelisten samtidig.")
-            c_m1, c_m2, c_m3 = st.columns(3)
+        # 4. HURTIGVERKTØY FLYTTET NEDERST (FYLLER KUN TOMME DAGER)
+        with st.expander("🛠️ **Hurtigverktøy for ukemenyen (Fyll tomme dager & Felles innkjøp)**", expanded=False):
+            st.caption("Knappene under lar dager du allerede har fylt ut stå i fred, og fyller kun inn de tomme dagene!")
+            c_m1, c_m2 = st.columns(2)
             with c_m1:
-                st.button("✨ Auto-planlegg uken", on_click=cb_auto_planlegg, args=(oppskriftsliste,), use_container_width=True)
+                st.button("✨ Fyll tomme dager (Auto)", on_click=cb_auto_planlegg, args=(oppskriftsliste,), use_container_width=True)
             with c_m2:
-                st.button("🧊 Planlegg fra fryseren", on_click=cb_planlegg_fra_fryser, args=(oppskrifter, data.get("fryser", [])), use_container_width=True)
+                st.button("🧊 Fyll tomme fra fryser", on_click=cb_planlegg_fra_fryser, args=(oppskrifter, data.get("fryser", [])), use_container_width=True)
+            
+            c_m3, c_m4 = st.columns(2)
             with c_m3:
                 if st.button("🛒 Hele uken til handleliste", use_container_width=True):
                     lagt = 0
@@ -1890,53 +2000,62 @@ if "middag" in fane_map:
                                 if legg_til_vare_i_data(i_navn): lagt += 1
                     lagre_naa()
                     st.toast(f"{lagt} ingredienser lagt i handlelisten! 🛒")
+            with c_m4:
+                st.button("🧹 Tøm hele ukemenyen", on_click=cb_tom_ukemeny, use_container_width=True)
 
-# ----------------- FANE: HANDLELISTE -----------------
+# ----------------- FANE: HANDLELISTE (MED BUTIKK-MODUS) -----------------
 if "handleliste" in fane_map:
     with fane_map["handleliste"]:
         st.subheader("🛒 Handleliste")
 
-        basisvarer = data.get("basisvarer", STANDARD_BASISVARER)
-        if basisvarer:
-            st.caption("⚡ **Hurtigknapper for basisvarer (inkl. brus & godteri):**")
-            kol_per_rad = 3
-            for start_idx in range(0, len(basisvarer), kol_per_rad):
-                rad_varer = basisvarer[start_idx:start_idx + kol_per_rad]
-                cols = st.columns(len(rad_varer))
-                for c_idx, b_item in enumerate(rad_varer):
-                    b_label = b_item.get("label", b_item.get("navn", "Vare"))
-                    b_navn = b_item.get("navn", b_label)
-                    b_kat = b_item.get("kategori", gjett_kategori(b_navn))
-                    b_id = b_item.get("id", str(uuid.uuid4()))
-                    
-                    if cols[c_idx].button(f"+ {b_label}", key=f"quick_btn_{b_id}", use_container_width=True):
-                        if legg_til_vare_i_data(b_navn, "", b_kat):
-                            lagre_naa()
-                            st.toast(f"Lagt til {b_navn}!")
-                            st.rerun()
-                        else:
-                            st.toast(f"{b_navn} ligger allerede klar i listen! 👍")
+        # KOMPRIMERT MENY FOR HURTIGKNAPPER & NYE VARER (ÅPEN KUN HVIS LISTEN ER TOM)
+        er_listen_tom = (len(data["handleliste"]) == 0)
+        with st.expander("➕ **Legg til varer & Hurtigknapper**", expanded=er_listen_tom):
+            basisvarer = data.get("basisvarer", STANDARD_BASISVARER)
+            if basisvarer:
+                st.caption("⚡ **Ett-klikks hurtigknapper:**")
+                kol_per_rad = 3
+                for start_idx in range(0, len(basisvarer), kol_per_rad):
+                    rad_varer = basisvarer[start_idx:start_idx + kol_per_rad]
+                    cols = st.columns(len(rad_varer))
+                    for c_idx, b_item in enumerate(rad_varer):
+                        b_label = b_item.get("label", b_item.get("navn", "Vare"))
+                        b_navn = b_item.get("navn", b_label)
+                        b_kat = b_item.get("kategori", gjett_kategori(b_navn))
+                        b_id = b_item.get("id", str(uuid.uuid4()))
+                        
+                        if cols[c_idx].button(f"+ {b_label}", key=f"quick_btn_{b_id}", use_container_width=True):
+                            if legg_til_vare_i_data(b_navn, "", b_kat):
+                                lagre_naa()
+                                st.toast(f"Lagt til {b_navn}!")
+                                st.rerun()
+                            else:
+                                st.toast(f"{b_navn} ligger allerede klar i listen! 👍")
 
-        st.write("")
+            st.write("---")
+            with st.form("form_ny_vare", clear_on_submit=True):
+                col_v, col_m = st.columns([0.65, 0.35])
+                ny_v = col_v.text_input("Vare:", placeholder="f.eks. Pepsi Max, Melkesjokolade, Epler")
+                ny_mengde = col_m.text_input("Mengde:", placeholder="f.eks. 4 pk, 1.5L, 2 poser")
+                ny_kat = st.selectbox("Avdeling:", ["✨ Automatisk"] + AVDELINGER)
+                
+                if st.form_submit_button("Legg til vare i listen 🛒", use_container_width=True) and ny_v.strip():
+                    k = None if ny_kat == "✨ Automatisk" else ny_kat
+                    if legg_til_vare_i_data(ny_v, ny_mengde, k):
+                        lagre_naa()
+                        st.toast(f"Lagt til {ny_v}!")
+                        st.rerun()
 
-        with st.form("form_ny_vare", clear_on_submit=True):
-            col_v, col_m = st.columns([0.65, 0.35])
-            ny_v = col_v.text_input("Vare:", placeholder="f.eks. Pepsi Max, Melkesjokolade, Epler")
-            ny_mengde = col_m.text_input("Mengde:", placeholder="f.eks. 4 pk, 1.5L, 2 poser")
-            ny_kat = st.selectbox("Avdeling:", ["✨ Automatisk"] + AVDELINGER)
-            
-            if st.form_submit_button("Legg til vare", use_container_width=True) and ny_v.strip():
-                k = None if ny_kat == "✨ Automatisk" else ny_kat
-                if legg_til_vare_i_data(ny_v, ny_mengde, k):
-                    lagre_naa()
-                    st.rerun()
-
-        st.write("---")
+        # SELVE HANDLELISTEN LIGGER ØVERST FOR RASK AVKRYSNING I BUTIKKEN
         handleliste_oppdatert = False
 
         if not data["handleliste"]:
-            st.info("Handlelisten er tom! 🎉")
+            st.info("Handlelisten er helt tom! 🎉 Åpne boksen over for å legge til varer.")
         else:
+            tot_varer = len(data["handleliste"])
+            kjopt_varer = len([v for v in data["handleliste"] if v.get("kjopt", False)])
+            st.caption(f"🏃‍♂️ **Butikk-oversikt:** `{kjopt_varer} av {tot_varer}` varer lagt i handlevognen.")
+
             for avd in AVDELINGER:
                 varer_i_avd = [v for v in data["handleliste"] if v.get("kategori") == avd]
                 if varer_i_avd:
@@ -1961,34 +2080,34 @@ if "handleliste" in fane_map:
                 st.rerun()
 
             st.divider()
-            antall_kjopte = len([v for v in data["handleliste"] if v.get("kjopt", False)])
-            if antall_kjopte > 0 and st.button(f"🧹 Fjern {antall_kjopte} avkryssede varer", use_container_width=True):
-                data["handleliste"] = [v for v in data["handleliste"] if not v.get("kjopt", False)]
-                lagre_naa()
-                st.toast("Avkryssede varer er fjernet!")
-                st.rerun()
+            c_hl1, c_hl2 = st.columns(2)
+            with c_hl1:
+                if kjopt_varer > 0 and st.button(f"🧹 Fjern {kjopt_varer} avkryssede", use_container_width=True):
+                    data["handleliste"] = [v for v in data["handleliste"] if not v.get("kjopt", False)]
+                    lagre_naa()
+                    st.toast("Avkryssede varer er fjernet!")
+                    st.rerun()
+            with c_hl2:
+                if st.button("🗑️ Tøm hele listen", use_container_width=True):
+                    data["handleliste"] = []
+                    lagre_naa()
+                    st.rerun()
 
-            if st.button("🗑️ Tøm hele listen", use_container_width=True):
-                data["handleliste"] = []
-                lagre_naa()
-                st.rerun()
-
-# ----------------- FANE: PAKKELISTE -----------------
+# ----------------- FANE: PAKKELISTE (MED KOMPRIMERTE SKJEMAER) -----------------
 if "pakkeliste" in fane_map:
     with fane_map["pakkeliste"]:
         st.subheader("🧳 Smart Pakkeliste for tur & utflukter")
-        st.caption("Gjør pakkingen til en lek! Barna kan krysse av tingene sine selv.")
 
         pakkeliste = data.get("pakkeliste", [])
         medlemmer = data.get("medlemmer", ["Far", "Mor", "Barn 1", "Barn 2"])
 
-        with st.expander("⚡ **Hent inn en ferdig tur-pakkeliste**", expanded=(len(pakkeliste) == 0)):
-            st.write("Velg en mal for å fylle listen automatisk:")
-            col_m1, col_m2 = st.columns([0.65, 0.35])
+        with st.expander("➕ **Legg til ting eller hent ferdig tur-mal**", expanded=(len(pakkeliste) == 0)):
+            st.markdown("**⚡ Hent ferdig tur-pakkeliste:**")
+            col_m1, col_m2, col_m3 = st.columns([0.45, 0.30, 0.25])
             valgt_mal_navn = col_m1.selectbox("Velg tur-type:", list(STANDARD_PAKKEMALER.keys()), label_visibility="collapsed")
             hvem_pakker_mal = col_m2.selectbox("Til hvem?", ["Felles"] + medlemmer, label_visibility="collapsed")
             
-            if st.button("Legg til malen i listen 🎒", use_container_width=True):
+            if col_m3.button("Hent mal 🎒", use_container_width=True):
                 items_mal = STANDARD_PAKKEMALER[valgt_mal_navn]
                 for itm in items_mal:
                     pakkeliste.append({
@@ -2002,26 +2121,24 @@ if "pakkeliste" in fane_map:
                 st.toast(f"Lagt til pakkeliste for {valgt_mal_navn}!")
                 st.rerun()
 
-        st.write("---")
-
-        with st.form("form_ny_pakke_ting", clear_on_submit=True):
-            col_pi_tekst, col_pi_ikon, col_pi_til, col_pi_btn = st.columns([0.45, 0.20, 0.20, 0.15])
-            p_tekst = col_pi_tekst.text_input("Hva skal pakkes?", placeholder="f.eks. Regnvotter, Hodelykt")
-            p_ikon = col_pi_ikon.selectbox("Ikon:", ["🧸", "🥾", "🌧️", "🧦", "🪥", "🥪", "🍶", "👙", "🌙", "🎒", "🔋", "✨"])
-            p_til = col_pi_til.selectbox("I sekken til:", ["Felles"] + medlemmer)
-            
-            if col_pi_btn.form_submit_button("Legg til", use_container_width=True) and p_tekst.strip():
-                pakkeliste.append({
-                    "id": str(uuid.uuid4()),
-                    "tekst": p_tekst.strip(),
-                    "ikon": p_ikon,
-                    "til": p_til,
-                    "pakket": False
-                })
-                lagre_naa()
-                st.rerun()
-
-        st.write("")
+            st.write("---")
+            st.markdown("**✏️ Legg til enkeltgjenstand:**")
+            with st.form("form_ny_pakke_ting", clear_on_submit=True):
+                col_pi_tekst, col_pi_ikon, col_pi_til, col_pi_btn = st.columns([0.45, 0.20, 0.20, 0.15])
+                p_tekst = col_pi_tekst.text_input("Hva skal pakkes?", placeholder="f.eks. Regnvotter, Hodelykt", label_visibility="collapsed")
+                p_ikon = col_pi_ikon.selectbox("Ikon:", ["🧸", "🥾", "🌧️", "🧦", "🪥", "🥪", "🍶", "👙", "🌙", "🎒", "🔋", "✨"], label_visibility="collapsed")
+                p_til = col_pi_til.selectbox("I sekken til:", ["Felles"] + medlemmer, label_visibility="collapsed")
+                
+                if col_pi_btn.form_submit_button("Legg til", use_container_width=True) and p_tekst.strip():
+                    pakkeliste.append({
+                        "id": str(uuid.uuid4()),
+                        "tekst": p_tekst.strip(),
+                        "ikon": p_ikon,
+                        "til": p_til,
+                        "pakket": False
+                    })
+                    lagre_naa()
+                    st.rerun()
 
         grupper = ["Felles"] + [m for m in medlemmer if m != "Felles"]
         pakkeliste_oppdatert = False
@@ -2077,7 +2194,7 @@ if "pakkeliste" in fane_map:
             st.divider()
             col_pk1, col_pk2 = st.columns(2)
             with col_pk1:
-                if st.button("🔄 Nullstill avkryssing (Klar til ny tur)", use_container_width=True):
+                if st.button("🔄 Nullstill avkryssing (Ny tur)", use_container_width=True):
                     for p in data["pakkeliste"]:
                         p["pakket"] = False
                     lagre_naa()
@@ -2094,7 +2211,7 @@ if "pakkeliste" in fane_map:
 if "garderobe" in fane_map:
     with fane_map["garderobe"]:
         st.subheader("👟 Barnas Garderobe & Klesstørrelser")
-        st.caption("Aldri mer usikker i klesbutikken! Sjekk størrelser og hva som mangler i skuffen eller barnehagen.")
+        st.caption("Hurtigoversikt i butikken og huskeliste for hva som mangler i kurven på skolen/barnehagen.")
 
         medlemmer = data.get("medlemmer", [])
         stjerne_brukere = data.get("stjerne_brukere", [])
@@ -2112,20 +2229,41 @@ if "garderobe" in fane_map:
                     "mangler": "Ekstra ullsokker, regnvotter"
                 })
 
-                with st.expander(f"{prof['ikon']} **{b_navn} sin garderobe**", expanded=True):
+                # Stilrent visningskort øverst for hvert barn
+                mangler_str = b_info.get("mangler", "").strip()
+                mangler_html = f"<div style='margin-top: 6px; font-size: 0.85rem; color: #FCD34D;'>🎒 <b>Mangler i kurven:</b> {mangler_str}</div>" if mangler_str else "<div style='margin-top: 6px; font-size: 0.85rem; color: #34D399;'>✅ Alt er på plass i kurven!</div>"
+
+                st.markdown(
+                    f"""
+                    <div style="background-color: #1E293B; border-left: 6px solid {prof['kant']}; border-radius: 12px; padding: 12px 14px; margin-bottom: 6px;">
+                        <div style="font-size: 1.1rem; font-weight: 900; color: #FFFFFF; margin-bottom: 6px;">
+                            {prof['ikon']} {b_navn}
+                        </div>
+                        <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.9rem; color: #E2E8F0;">
+                            <span>👟 <b>Sko:</b> {b_info.get('sko', '-')}</span>
+                            <span>👕 <b>Klær:</b> {b_info.get('klaer', '-')}</span>
+                            <span>🧢 <b>Lue:</b> {b_info.get('lue', '-')}</span>
+                        </div>
+                        {mangler_html}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                with st.expander(f"✏️ Rediger {b_navn} sin garderobe / Send til handleliste", expanded=False):
                     c_sko, c_klaer, c_lue = st.columns(3)
                     ny_sko = c_sko.text_input("Skostørrelse:", value=b_info.get("sko", ""), key=f"g_sko_{b_navn}")
                     ny_klaer = c_klaer.text_input("Klesstørrelse:", value=b_info.get("klaer", ""), key=f"g_klaer_{b_navn}")
-                    ny_lue = c_lue.text_input("Luestr. / Hodeomkrets:", value=b_info.get("lue", ""), key=f"g_lue_{b_navn}")
+                    ny_lue = c_lue.text_input("Luestr.:", value=b_info.get("lue", ""), key=f"g_lue_{b_navn}")
 
                     ny_mangler = st.text_area(
-                        "🎒 Mangler i kurven (barnehage/skole):",
+                        "🎒 Mangler i kurven (kommaseparert):",
                         value=b_info.get("mangler", ""),
                         key=f"g_mangler_{b_navn}",
                         placeholder="f.eks. Regnvotter, ekstra skift, gummistøvler..."
                     )
 
-                    c_g_lagre, c_g_handle = st.columns([0.65, 0.35])
+                    c_g_lagre, c_g_handle = st.columns([0.55, 0.45])
                     with c_g_lagre:
                         if st.button("Lagre størrelser 💾", key=f"btn_lagre_g_{b_navn}", use_container_width=True):
                             garderobe[b_navn] = {
@@ -2321,26 +2459,27 @@ if "admin" in fane_map:
                     st.rerun()
             st.write("")
 
-        with st.form("form_nytt_medlem", clear_on_submit=True):
-            col_nm1, col_nm2, col_nm3 = st.columns([0.45, 0.30, 0.25])
-            f_n = col_nm1.text_input("Ny person:", placeholder="Navn")
-            f_fig = col_nm2.selectbox("Figur:", MULIGE_FIGURER)
-            f_col = col_nm3.selectbox("Farge:", list(FARGE_TEMALISTE.keys()))
-            f_s = st.checkbox("Samle stjerner?", value=True)
-            
-            if st.form_submit_button("Legg til person", use_container_width=True) and f_n.strip():
-                if f_n.strip() not in data["medlemmer"]:
-                    ny_p_navn = f_n.strip()
-                    data["medlemmer"].append(ny_p_navn)
-                    data["person_profiler"][ny_p_navn] = {
-                        "ikon": f_fig.split()[0],
-                        "farge": f_col
-                    }
-                    if f_s:
-                        data["stjerne_brukere"].append(ny_p_navn)
-                        data["poeng"][ny_p_navn] = 0
-                    lagre_naa()
-                    st.rerun()
+        with st.expander("➕ **Legg til nytt familiemedlem**"):
+            with st.form("form_nytt_medlem", clear_on_submit=True):
+                col_nm1, col_nm2, col_nm3 = st.columns([0.45, 0.30, 0.25])
+                f_n = col_nm1.text_input("Ny person:", placeholder="Navn")
+                f_fig = col_nm2.selectbox("Figur:", MULIGE_FIGURER)
+                f_col = col_nm3.selectbox("Farge:", list(FARGE_TEMALISTE.keys()))
+                f_s = st.checkbox("Samle stjerner?", value=True)
+                
+                if st.form_submit_button("Legg til person", use_container_width=True) and f_n.strip():
+                    if f_n.strip() not in data["medlemmer"]:
+                        ny_p_navn = f_n.strip()
+                        data["medlemmer"].append(ny_p_navn)
+                        data["person_profiler"][ny_p_navn] = {
+                            "ikon": f_fig.split()[0],
+                            "farge": f_col
+                        }
+                        if f_s:
+                            data["stjerne_brukere"].append(ny_p_navn)
+                            data["poeng"][ny_p_navn] = 0
+                        lagre_naa()
+                        st.rerun()
 
         st.divider()
 
