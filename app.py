@@ -5,7 +5,6 @@ import uuid
 import base64
 import io
 import time
-import math
 import calendar
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -118,7 +117,7 @@ KATEGORI_REGLER = {
     ],
     "🧀 Meieri & Kjølevare": [
         "melk", "ost", "rømme", "smør", "fløte", "yoghurt", "egg", "kesam", 
-        "parmesan", "margarin", "majones", "leverpostei", "kaviar", "cottage cheese", "gjær"
+        "parmesan", "margarin", "majones", "leverpostei", "kaviar", "cottage cheese"
     ],
     "🥤 Drikkevarer": [
         "brus", "pepsi", "cola", "solo", "fanta", "sprite", "juice", "saft", 
@@ -193,6 +192,7 @@ def hent_profil(person, data_ref):
 
 st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
 
+# ----------------- KORRIGERT CSS (GOD PLASS ØVERST + PILLE-FANER) -----------------
 IKON_URL = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f3e1.png"
 
 skjul_streamlit_elementer = f"""
@@ -206,11 +206,13 @@ skjul_streamlit_elementer = f"""
     [data-testid="manage-app-button"] {{display: none !important;}}
     div[class*="viewerBadge"] {{display: none !important;}}
     
+    /* God plass i toppen slik at hele Familiehub-banneret synes */
     .block-container {{
         padding-top: 1.5rem !important;
         padding-bottom: 3rem !important;
     }}
 
+    /* Stilrene Pille-faner (Tabs) */
     div[data-testid="stTabs"] button[data-baseweb="tab"] {{
         background-color: #1E293B !important;
         border-radius: 12px !important;
@@ -231,6 +233,7 @@ skjul_streamlit_elementer = f"""
         display: none !important;
     }}
 
+    /* Mykere og mer moderne Expanders */
     div[data-testid="stExpander"] {{
         border-radius: 12px !important;
         border: 1px solid #334155 !important;
@@ -238,6 +241,7 @@ skjul_streamlit_elementer = f"""
         margin-bottom: 8px !important;
     }}
 
+    /* Ekstra tydelige avkrysningsbokser */
     div[data-testid="stCheckbox"] label {{
         padding-top: 3px !important;
         padding-bottom: 3px !important;
@@ -339,11 +343,9 @@ def migrer_fryser(gammel_liste):
         if isinstance(item, dict):
             if "plassering" not in item:
                 item["plassering"] = "fryser"
-            if "snart" not in item:
-                item["snart"] = False
             ny_liste.append(item)
         elif isinstance(item, str):
-            ny_liste.append({"id": str(uuid.uuid4()), "navn": item, "plassering": "fryser", "snart": False})
+            ny_liste.append({"id": str(uuid.uuid4()), "navn": item, "plassering": "fryser"})
     return ny_liste
 
 def migrer_pakkeliste(gammel_pakkeliste):
@@ -397,10 +399,10 @@ def standard_data(valgt_pin="1234"):
         "aktiviteter": STANDARD_AKTIVITETER,
         "stjerne_logg": [],
         "fryser": [
-            {"id": str(uuid.uuid4()), "navn": "Laksefilet (4 pk)", "plassering": "fryser", "snart": False},
-            {"id": str(uuid.uuid4()), "navn": "Kjøttdeig 400g", "plassering": "fryser", "snart": False},
-            {"id": str(uuid.uuid4()), "navn": "Pastasaus på glass", "plassering": "matskap", "snart": False},
-            {"id": str(uuid.uuid4()), "navn": "Hakkede tomater 2 bokser", "plassering": "matskap", "snart": False}
+            {"id": str(uuid.uuid4()), "navn": "Laksefilet (4 pk)", "plassering": "fryser"},
+            {"id": str(uuid.uuid4()), "navn": "Kjøttdeig 400g", "plassering": "fryser"},
+            {"id": str(uuid.uuid4()), "navn": "Pastasaus på glass", "plassering": "matskap"},
+            {"id": str(uuid.uuid4()), "navn": "Hakkede tomater 2 bokser", "plassering": "matskap"}
         ],
         "beskjeder": [
             {"id": str(uuid.uuid4()), "tekst": "Velkommen til Familiehuben! 🌟", "fra": "Familien", "tid": "Kl. 08:00"}
@@ -654,9 +656,6 @@ def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
                 if mengde.strip():
                     v["mengde"] = mengde.strip()
                 return True
-            elif mengde.strip() and not v.get("mengde"):
-                v["mengde"] = mengde.strip()
-                return True
             return False
     
     valgt_kat = kategori if kategori and kategori in AVDELINGER else gjett_kategori(renset_navn)
@@ -669,6 +668,7 @@ def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
     })
     return True
 
+# CALLBACKS FOR LYNRASK AVKRYSNING UTEN Å HOPPE UT AV FANEN
 def cb_toggle_handleliste_vare(vare_id):
     ny_verdi = st.session_state.get(f"hl_chk_{vare_id}", False)
     for v in data["handleliste"]:
@@ -719,9 +719,7 @@ def cb_planlegg_fra_fryser(oppskrifter, fryser_varer):
         return
         
     allerede_valgt = [st.session_state.get(f"rett_{d}", "").strip() for d in DAGER if st.session_state.get(f"rett_{d}", "").strip()]
-    # Prioriter varer merket med "snart" først
-    fryser_sortert = sorted(fryser_varer, key=lambda x: 0 if x.get("snart", False) else 1)
-    fryser_tekster = [f["navn"].lower() for f in fryser_sortert]
+    fryser_tekster = [f["navn"].lower() for f in fryser_varer]
     matcher = []
     andre_retter = []
     
@@ -743,6 +741,7 @@ def cb_planlegg_fra_fryser(oppskrifter, fryser_varer):
             andre_retter.append(rett_navn)
             
     matcher = list(dict.fromkeys(matcher))
+    random.shuffle(matcher)
     random.shuffle(andre_retter)
     
     kandidater = matcher + andre_retter
@@ -793,51 +792,6 @@ def cb_start_ny_uke():
         st.session_state[f"rett_{dag}"] = ""
     data["uke_oppgaver_lost"] = 0
     lagre_naa()
-
-# HJELPEFUNKSJON FOR GJESTEKALKULATOR (NR. 2)
-def beregn_gjestemat(rett_type, voksne, barn):
-    porsjoner = voksne + (barn * 0.6)
-    if "Taco" in rett_type:
-        kjott_g = int(math.ceil((porsjoner * 150) / 100.0) * 100)
-        pakker_kjott = max(1, round(kjott_g / 400))
-        lefser = int(math.ceil(voksne * 2.5 + barn * 1.5))
-        krydder = max(1, int(math.ceil(kjott_g / 400)))
-        romme = max(1, int(math.ceil(porsjoner / 4.5)))
-        ost_g = int(math.ceil((porsjoner * 45) / 50.0) * 50)
-        return [
-            {"navn": "Kjøttdeig", "mengde": f"{kjott_g}g ({pakker_kjott} pk)", "kat": "🥩 Kjøtt, Fisk & Fjærkre"},
-            {"navn": "Tortillalefser", "mengde": f"{lefser} stk", "kat": "🍞 Tørrvare, Krydder & Kolonial"},
-            {"navn": "Tacokrydder", "mengde": f"{krydder} pose(r)", "kat": "🍞 Tørrvare, Krydder & Kolonial"},
-            {"navn": "Rømme", "mengde": f"{romme} beger", "kat": "🧀 Meieri & Kjølevare"},
-            {"navn": "Revet ost", "mengde": f"ca. {ost_g}g", "kat": "🧀 Meieri & Kjølevare"},
-            {"navn": "Salsa", "mengde": f"{max(1, int(math.ceil(porsjoner / 5)))} glass", "kat": "🍞 Tørrvare, Krydder & Kolonial"},
-            {"navn": "Mais, Agurk & Paprika", "mengde": "Tilbehør", "kat": "🥦 Frukt & Grønt"}
-        ]
-    elif "Pizza" in rett_type:
-        antall_langpanner = max(1, int(math.ceil(porsjoner / 3.5)))
-        mel_g = antall_langpanner * 450
-        ost_g = antall_langpanner * 300
-        saus = antall_langpanner
-        return [
-            {"navn": "Hvetemel (til pizzadeig)", "mengde": f"{mel_g}g ({antall_langpanner} bunner)", "kat": "🍞 Tørrvare, Krydder & Kolonial"},
-            {"navn": "Tørrgjær", "mengde": f"{antall_langpanner} pk", "kat": "🧀 Meieri & Kjølevare"},
-            {"navn": "Pizzasaus", "mengde": f"{saus} glass/boks", "kat": "🍞 Tørrvare, Krydder & Kolonial"},
-            {"navn": "Revet ost", "mengde": f"{ost_g}g", "kat": "🧀 Meieri & Kjølevare"},
-            {"navn": "Skinke / Pepperoni", "mengde": f"{antall_langpanner} pk", "kat": "🥩 Kjøtt, Fisk & Fjærkre"}
-        ]
-    else:  # Pannekaker
-        melk_dl = int(math.ceil(porsjoner * 2.0))
-        mel_dl = int(math.ceil(melk_dl * 0.6))
-        egg = max(2, int(math.ceil(melk_dl / 2.5)))
-        bacon_pk = max(1, int(math.ceil(porsjoner / 3.0)))
-        return [
-            {"navn": "Melk", "mengde": f"{melk_dl} dl", "kat": "🧀 Meieri & Kjølevare"},
-            {"navn": "Hvetemel", "mengde": f"{mel_dl} dl", "kat": "🍞 Tørrvare, Krydder & Kolonial"},
-            {"navn": "Egg", "mengde": f"{egg} stk", "kat": "🧀 Meieri & Kjølevare"},
-            {"navn": "Smør (til steking/røre)", "mengde": f"{egg * 15}g", "kat": "🧀 Meieri & Kjølevare"},
-            {"navn": "Bacon", "mengde": f"{bacon_pk} pk", "kat": "🥩 Kjøtt, Fisk & Fjærkre"},
-            {"navn": "Blåbærsyltetøy", "mengde": "1 glass", "kat": "🍞 Tørrvare, Krydder & Kolonial"}
-        ]
 
 for dag in DAGER:
     if f"rett_{dag}" not in st.session_state:
@@ -902,7 +856,7 @@ with col_banner:
     """
     st.markdown(banner_html, unsafe_allow_html=True)
 
-# ----------------- «I DAG»-HURTIGKORT ØVERST (INKL. UTLØPSVARSEL NR. 8) -----------------
+# ----------------- «I DAG»-HURTIGKORT ØVERST -----------------
 dagens_middag_rett = data.get("middagsplan", {}).get(idag_navn, "").strip()
 middag_vis_tekst = f"<b>{dagens_middag_rett}</b>" if dagens_middag_rett else "<span style='color: #94A3B8;'>Ikke valgt enda</span>"
 
@@ -920,12 +874,6 @@ if moduler.get("oppgaver", True):
     venter_badge = f" &nbsp;•&nbsp; <span style='color: #FCD34D; font-weight: 800;'>🔔 {ant_venter} venter på sjekk!</span>" if ant_venter > 0 else ""
     oppg_linje_html = f"<div style='margin-top: 4px; font-size: 0.84rem; color: #E2E8F0;'>⭐ <b>Oppgaver:</b> {ant_ugjort} ugjorte i dag{venter_badge}</div>"
 
-snart_varer = [v["navn"] for v in data.get("fryser", []) if v.get("snart", False)]
-snart_linje_html = ""
-if snart_varer:
-    snart_liste_str = ", ".join(snart_varer)
-    snart_linje_html = f"<div style='margin-top: 5px; padding-top: 4px; border-top: 1px dashed #334155; font-size: 0.84rem; color: #FDBA74;'>🔥 <b>Bør spises snart:</b> {snart_liste_str}</div>"
-
 idag_kort_html = f"""
 <div style="background-color: #1E293B; border: 1.5px solid #334155; border-left: 5px solid #3B82F6; border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
     <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 0.88rem; color: #F8FAFC;">
@@ -933,7 +881,6 @@ idag_kort_html = f"""
         <div>🗓️ <b>Skjer i dag:</b> {kal_vis_tekst}</div>
     </div>
     {oppg_linje_html}
-    {snart_linje_html}
 </div>
 """
 st.markdown(idag_kort_html, unsafe_allow_html=True)
@@ -1153,7 +1100,7 @@ with st.expander(oppslag_tittel, expanded=False):
 
 er_forelder = st.session_state["foreldremodus"]
 
-# ----------------- STATISKE FANENAVN -----------------
+# ----------------- STATISKE FANENAVN (FORHINDRER HOPPING MELLOM FANER) -----------------
 antall_venter_oppg = len([o for o in data.get("oppgaver", []) if o.get("status") == "venter"])
 oppg_fane_navn = f"⭐ Oppgaver (🔔 {antall_venter_oppg})" if antall_venter_oppg > 0 else "⭐ Oppgaver"
 
@@ -1165,7 +1112,7 @@ if moduler.get("middag", True): faner_konfig.append(("middag", "🍽️ Middag &
 if moduler.get("handleliste", True): faner_konfig.append(("handleliste", "🛒 Handleliste"))
 if moduler.get("pakkeliste", True): faner_konfig.append(("pakkeliste", "🧳 Pakkeliste"))
 if moduler.get("garderobe", True): faner_konfig.append(("garderobe", "👟 Garderobe"))
-if moduler.get("aktiviteter", True): faner_konfig.append(("aktiviteter", "🎡 Lykkehjul & Aktiviteter"))
+if moduler.get("aktiviteter", True): faner_konfig.append(("aktiviteter", "🎲 Aktiviteter"))
 if er_forelder: faner_konfig.append(("admin", "👨‍👩‍👧‍👦 Admin"))
 
 if not faner_konfig:
@@ -1789,34 +1736,23 @@ if "statistikk" in fane_map:
         else:
             st.info("Ingen stjerneaktiviteter er loggført enda. Når du godkjenner oppgaver eller barna løser inn premier, dukker loggen opp her! 🌟")
 
-# ----------------- FANE: MIDDAG & FRYSER (MED NR. 2, 3 OG 8) -----------------
+# ----------------- FANE: MIDDAG & FRYSER -----------------
 if "middag" in fane_map:
     with fane_map["middag"]:
-        # 1. FRYSER OG MATSKAP MED UTLØPSVARSEL (NR. 8)
-        ant_snart = len([v for v in data.get("fryser", []) if v.get("snart", False)])
-        fryser_tittel = f"🧊 **Familiens Fryser & Matskap (🔥 {ant_snart} bør brukes snart!)**" if ant_snart > 0 else "🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**"
-        
-        with st.expander(fryser_tittel, expanded=(ant_snart > 0)):
-            st.caption("Trykk på 🔥 for å markere varer som bør spises snart, eller 🍽️ for å sette varen på menyen i dag.")
+        with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
             fryser_data = data.get("fryser", [])
-            varer_fryser = sorted([v for v in fryser_data if v.get("plassering", "fryser") == "fryser"], key=lambda x: 0 if x.get("snart", False) else 1)
-            varer_matskap = sorted([v for v in fryser_data if v.get("plassering") == "matskap"], key=lambda x: 0 if x.get("snart", False) else 1)
+            varer_fryser = [v for v in fryser_data if v.get("plassering", "fryser") == "fryser"]
+            varer_matskap = [v for v in fryser_data if v.get("plassering") == "matskap"]
             
             slett_f_id = None
-            toggle_snart_id = None
             col_fryser, col_matskap = st.columns(2)
 
             with col_fryser:
                 st.markdown("##### 🧊 Fryser")
                 if varer_fryser:
                     for fv in varer_fryser:
-                        er_snart = fv.get("snart", False)
-                        c_txt, c_snart, c_btn, c_del = st.columns([0.52, 0.16, 0.16, 0.16])
-                        f_farge = "#FDBA74" if er_snart else "#FFFFFF"
-                        f_ikon = "🔥" if er_snart else "📦"
-                        c_txt.markdown(f"<div style='padding-top: 5px; font-size: 0.85rem; font-weight: 700; color: {f_farge};'>{f_ikon} {fv['navn']}</div>", unsafe_allow_html=True)
-                        if c_snart.button("🔥", key=f"f_snart_{fv['id']}", help="Marker/fjern 'Bør spises snart'"):
-                            toggle_snart_id = fv["id"]
+                        c_txt, c_btn, c_del = st.columns([0.64, 0.20, 0.16])
+                        c_txt.markdown(f"<div style='padding-top: 5px; font-size: 0.88rem; font-weight: 700; color: #FFFFFF;'>📦 {fv['navn']}</div>", unsafe_allow_html=True)
                         if c_btn.button("🍽️", key=f"f_sett_{fv['id']}", help=f"Sett {fv['navn']} som middag i dag"):
                             data["middagsplan"][idag_navn] = fv["navn"]
                             st.session_state[f"rett_{idag_navn}"] = fv["navn"]
@@ -1832,13 +1768,8 @@ if "middag" in fane_map:
                 st.markdown("##### 🥫 Matskap / Tørrvare")
                 if varer_matskap:
                     for mv in varer_matskap:
-                        er_snart = mv.get("snart", False)
-                        c_txt, c_snart, c_btn, c_del = st.columns([0.52, 0.16, 0.16, 0.16])
-                        m_farge = "#FDBA74" if er_snart else "#FFFFFF"
-                        m_ikon = "🔥" if er_snart else "🥫"
-                        c_txt.markdown(f"<div style='padding-top: 5px; font-size: 0.85rem; font-weight: 700; color: {m_farge};'>{m_ikon} {mv['navn']}</div>", unsafe_allow_html=True)
-                        if c_snart.button("🔥", key=f"m_snart_{mv['id']}", help="Marker/fjern 'Bør spises snart'"):
-                            toggle_snart_id = mv["id"]
+                        c_txt, c_btn, c_del = st.columns([0.64, 0.20, 0.16])
+                        c_txt.markdown(f"<div style='padding-top: 5px; font-size: 0.88rem; font-weight: 700; color: #FFFFFF;'>🥫 {mv['navn']}</div>", unsafe_allow_html=True)
                         if c_btn.button("🍽️", key=f"m_sett_{mv['id']}", help=f"Sett {mv['navn']} som middag i dag"):
                             data["middagsplan"][idag_navn] = mv["navn"]
                             st.session_state[f"rett_{idag_navn}"] = mv["navn"]
@@ -1850,14 +1781,6 @@ if "middag" in fane_map:
                 else:
                     st.caption("Tomt i matskapet.")
 
-            if toggle_snart_id:
-                for x in data["fryser"]:
-                    if x["id"] == toggle_snart_id:
-                        x["snart"] = not x.get("snart", False)
-                        break
-                lagre_naa()
-                st.rerun()
-
             if slett_f_id:
                 data["fryser"] = [x for x in data["fryser"] if x["id"] != slett_f_id]
                 lagre_naa()
@@ -1865,126 +1788,19 @@ if "middag" in fane_map:
 
             st.write("---")
             with st.form("form_ny_lagret_vare", clear_on_submit=True):
-                col_in_navn, col_in_plass, col_in_snart, col_in_btn = st.columns([0.42, 0.25, 0.18, 0.15])
-                ny_f_tekst = col_in_navn.text_input("Ny vare:", placeholder="f.eks. Kjøttkaker, Laks", label_visibility="collapsed")
+                col_in_navn, col_in_plass, col_in_btn = st.columns([0.55, 0.28, 0.17])
+                ny_f_tekst = col_in_navn.text_input("Ny vare:", placeholder="f.eks. Kjøttkaker 2 pk, Laks", label_visibility="collapsed")
                 ny_f_sted = col_in_plass.selectbox("Hvor?", ["🧊 Fryser", "🥫 Matskap"], label_visibility="collapsed")
-                ny_f_snart = col_in_snart.checkbox("🔥 Snart", value=False, help="Bør spises snart")
                 
-                if col_in_btn.form_submit_button("Lagre", use_container_width=True) and ny_f_tekst.strip():
+                if col_in_btn.form_submit_button("Legg til ➕", use_container_width=True) and ny_f_tekst.strip():
                     sted_kode = "fryser" if "Fryser" in ny_f_sted else "matskap"
-                    data["fryser"].append({
-                        "id": str(uuid.uuid4()),
-                        "navn": ny_f_tekst.strip(),
-                        "plassering": sted_kode,
-                        "snart": ny_f_snart
-                    })
+                    data["fryser"].append({"id": str(uuid.uuid4()), "navn": ny_f_tekst.strip(), "plassering": sted_kode})
                     lagre_naa()
                     st.rerun()
 
-        # 2. NØDKNAPPEN: HVA KAN VI LAGE AKKURAT NÅ? (NR. 3)
         oppskrifter = data.get("oppskrifter", STANDARD_MIDDAGER)
         oppskriftsliste = sorted(list(oppskrifter.keys()))
-
-        with st.expander("🆘 **«Nødknappen» — Hva kan vi lage av det vi har nå?**", expanded=False):
-            st.caption("Sjekker oppskriftene deres mot alt som ligger i Fryser, Matskap og Basisvarer akkurat nå!")
-            
-            lager_ord = []
-            for f_item in data.get("fryser", []):
-                lager_ord.append(f_item["navn"].lower())
-            for b_item in data.get("basisvarer", STANDARD_BASISVARER):
-                lager_ord.append(b_item.get("navn", "").lower())
-
-            forslag_liste = []
-            for r_navn, r_info in oppskrifter.items():
-                ingr = r_info.get("ingredienser", [])
-                if not ingr:
-                    continue
-                har_ingr = []
-                mangler_ingr = []
-                for i_str in ingr:
-                    i_low = i_str.lower()
-                    i_deler = [w for w in i_low.split() if len(w) > 2]
-                    funnet = False
-                    for l_vare in lager_ord:
-                        if i_low in l_vare or l_vare in i_low or any(w in l_vare for w in i_deler):
-                            funnet = True
-                            break
-                    if funnet:
-                        har_ingr.append(i_str)
-                    else:
-                        mangler_ingr.append(i_str)
-                
-                andel = len(har_ingr) / len(ingr)
-                forslag_liste.append({
-                    "rett": r_navn,
-                    "har": har_ingr,
-                    "mangler": mangler_ingr,
-                    "andel": andel,
-                    "ant_mangler": len(mangler_ingr)
-                })
-
-            forslag_sortert = sorted(forslag_liste, key=lambda x: (x["ant_mangler"], -x["andel"]))
-
-            for f_rett in forslag_sortert[:5]:
-                r_tittel = f_rett["rett"]
-                ant_m = f_rett["ant_mangler"]
-                har_str = ", ".join(f_rett["har"]) if f_rett["har"] else "Ingen"
-                mangler_str = ", ".join(f_rett["mangler"]) if f_rett["mangler"] else "Ingenting! Dere har alt 🎉"
-                
-                kant_farge = "#10B981" if ant_m == 0 else ("#F59E0B" if ant_m <= 2 else "#64748B")
-                status_tag = "🎉 Klar til å lages!" if ant_m == 0 else f"Mangler kun {ant_m} ting"
-
-                st.markdown(
-                    f"""
-                    <div style="background-color: #1E293B; border-left: 5px solid {kant_farge}; border-radius: 10px; padding: 10px 12px; margin-bottom: 6px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-weight: 900; font-size: 1rem; color: #FFFFFF;">🍽️ {r_tittel}</span>
-                            <span style="background-color: #0F172A; color: {kant_farge}; padding: 2px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 800;">{status_tag}</span>
-                        </div>
-                        <div style="font-size: 0.8rem; color: #6EE7B7; margin-top: 4px;">✅ <b>Har hjemme:</b> {har_str}</div>
-                        <div style="font-size: 0.8rem; color: #FCA5A5;">❌ <b>Mangler:</b> {mangler_str}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-                c_nod1, c_nod2 = st.columns(2)
-                with c_nod1:
-                    if st.button(f"🍽️ Velg som middag i dag", key=f"nod_idag_{r_tittel}", use_container_width=True):
-                        data["middagsplan"][idag_navn] = r_tittel
-                        st.session_state[f"rett_{idag_navn}"] = r_tittel
-                        lagre_naa()
-                        st.toast(f"Satt {r_tittel} som dagens middag!")
-                        st.rerun()
-                with c_nod2:
-                    if f_rett["mangler"] and st.button(f"🛒 Kjøp de {ant_m} som mangler", key=f"nod_kjop_{r_tittel}", use_container_width=True):
-                        for m_vare in f_rett["mangler"]:
-                            legg_til_vare_i_data(m_vare)
-                        lagre_naa()
-                        st.toast(f"La til {ant_m} manglende varer i handlelisten!")
-
-        # 3. GJESTEKALKULATOR FOR TACO, PIZZA & PANNEKAKER (NR. 2)
-        with st.expander("🍕 **Gjestekalkulator (Taco, Pizza & Pannekaker)**", expanded=False):
-            st.caption("Får dere besøk? Juster antall voksne og barn, så regner kalkulatoren ut nøyaktige mengder!")
-            valgt_kalk_rett = st.radio("Velg måltid:", ["🌮 Taco-kveld", "🍕 Hjemmelaget Pizza", "🥞 Pannekaker med bacon"], horizontal=True)
-            c_gv, c_gb = st.columns(2)
-            ant_voksne = c_gv.slider("👨👩 Antall voksne:", min_value=1, max_value=12, value=2)
-            ant_barn = c_gb.slider("🧒👧 Antall barn:", min_value=0, max_value=12, value=2)
-
-            beregnede_varer = beregn_gjestemat(valgt_kalk_rett, ant_voksne, ant_barn)
-            
-            st.markdown(f"**📋 Beregnet handleliste for {ant_voksne} voksne og {ant_barn} barn:**")
-            for bv in beregnede_varer:
-                st.markdown(f"- **{bv['navn']}:** `{bv['mengde']}`")
-
-            if st.button("🛒 Send alle mengdene rett til handlelisten!", use_container_width=True, key="btn_kalk_handle"):
-                lagt_til = 0
-                for bv in beregnede_varer:
-                    if legg_til_vare_i_data(bv["navn"], bv["mengde"], bv["kat"]):
-                        lagt_til += 1
-                lagre_naa()
-                st.toast(f"Lagt til {len(beregnede_varer)} ferdigberegnede varer i handlelisten! 🛒")
-
-        st.write("")
+        
         st.markdown("#### 📅 Ukens Middagsplan")
         
         dag_rader = [
@@ -2196,7 +2012,7 @@ if "middag" in fane_map:
             with c_m4:
                 st.button("🧹 Tøm hele ukemenyen", on_click=cb_tom_ukemeny, use_container_width=True)
 
-# ----------------- FANE: HANDLELISTE -----------------
+# ----------------- FANE: HANDLELISTE (UTEN FANE-HOPPING) -----------------
 if "handleliste" in fane_map:
     with fane_map["handleliste"]:
         st.subheader("🛒 Handleliste")
@@ -2472,89 +2288,37 @@ if "garderobe" in fane_map:
                             lagre_naa()
                             st.toast(f"Lagt til {lagt_til} ting i handlelisten!")
 
-# ----------------- FANE: LYKKEHJUL & AKTIVITETER (INKL. NR. 1) -----------------
+# ----------------- FANE: AKTIVITETER -----------------
 if "aktiviteter" in fane_map:
     with fane_map["aktiviteter"]:
-        st.subheader("🎡 Familiens Lykkehjul")
-        st.caption("Slutt på krangling og beslutningsvegring! La hjulet avgjøre hvem sin tur det er, hva dere skal spise eller hva dere skal finne på.")
+        st.subheader("🎲 Hva skal vi finne på?")
+        st.caption("Trykk på knappen for å trekke en morsom idé til hva familien kan gjøre sammen!")
 
-        hjul_kategori = st.radio(
-            "Hva vil dere spinne om?",
-            ["👤 Hvem sin tur?", "🍽️ Hva skal vi spise?", "🎲 Aktivitet", "✍️ Egne valg"],
-            horizontal=True
-        )
-
-        medlemmer = data.get("medlemmer", ["Far", "Mor", "Barn 1", "Barn 2"])
         aktiviteter = data.get("aktiviteter", STANDARD_AKTIVITETER)
-        oppskrift_navn = list(data.get("oppskrifter", STANDARD_MIDDAGER).keys())
-
-        if hjul_kategori == "👤 Hvem sin tur?":
-            kandidater = st.multiselect(
-                "Hvem er med i trekningen?",
-                options=medlemmer,
-                default=medlemmer
-            )
-            forklaring_tittel = "Den utvalgte er:"
-        elif hjul_kategori == "🍽️ Hva skal vi spise?":
-            kandidater = oppskrift_navn
-            forklaring_tittel = "Hjulet valgte middagen:"
-        elif hjul_kategori == "🎲 Aktivitet":
-            kandidater = aktiviteter
-            forklaring_tittel = "Dagens aktivitet ble:"
-        else:
-            egne_tekst = st.text_input("Skriv alternativer med komma mellom:", value="Kino, Bowling, Brettspill, Bade, Bake boller")
-            kandidater = [x.strip() for x in egne_tekst.split(",") if x.strip()]
-            forklaring_tittel = "Vinneren ble:"
-
-        hjul_plassholder = st.empty()
-
-        if st.button("🎡 SPINN LYKKEHJULET!", use_container_width=True, type="primary"):
-            if not kandidater:
-                st.warning("Legg inn minst ett alternativ for å spinne!")
-            else:
-                # Visuell spinne-animasjon
-                antall_steg = 14
-                for steg in range(antall_steg):
-                    midlertidig = random.choice(kandidater)
-                    farge_ kant = random.choice(["#3B82F6", "#F59E0B", "#EC4899", "#10B981", "#8B5CF6"])
-                    hjul_plassholder.markdown(
-                        f"""
-                        <div style="background-color: #1E293B; border: 3px dashed {farge_kant}; border-radius: 16px; padding: 22px; text-align: center; margin: 12px 0;">
-                            <div style="font-size: 0.9rem; color: #94A3B8; font-weight: 700;">🎡 Hjulet spinner...</div>
-                            <div style="font-size: 1.5rem; font-weight: 900; color: #FFFFFF; margin-top: 6px;">{midlertidig}</div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                    time.sleep(0.05 + (steg * 0.015))
-
-                vinner = random.choice(kandidater)
-                st.session_state["lykkehjul_vinner"] = (forklaring_tittel, vinner, hjul_kategori)
+        
+        if st.button("🎰 Trekk en tilfeldig aktivitet!", use_container_width=True):
+            if aktiviteter:
+                valgt_akt = random.choice(aktiviteter)
+                st.session_state["trukket_aktivitet"] = valgt_akt
                 st.balloons()
+            else:
+                st.warning("Ingen aktiviteter på listen!")
 
-        if "lykkehjul_vinner" in st.session_state:
-            tittel_v, vinner_v, kat_v = st.session_state["lykkehjul_vinner"]
-            hjul_plassholder.markdown(
+        if "trukket_aktivitet" in st.session_state:
+            st.markdown(
                 f"""
-                <div style="background: linear-gradient(135deg, #064E3B 0%, #047857 100%); border: 3px solid #34D399; border-radius: 16px; padding: 22px; text-align: center; margin: 12px 0; box-shadow: 0 6px 15px rgba(16, 185, 129, 0.3);">
-                    <div style="font-size: 1rem; color: #A7F3D0; font-weight: 800; text-transform: uppercase;">🎉 {tittel_v}</div>
-                    <div style="font-size: 1.65rem; font-weight: 900; color: #FFFFFF; margin-top: 6px;">
-                        🏆 {vinner_v}
+                <div style="background-color: #064E3B; border: 2px solid #10B981; border-radius: 12px; padding: 18px; text-align: center; margin: 14px 0;">
+                    <div style="font-size: 1.1rem; color: #A7F3D0; font-weight: 800;">Dagens utvalgte aktivitet:</div>
+                    <div style="font-size: 1.45rem; font-weight: 900; color: #FFFFFF; margin-top: 6px;">
+                        {st.session_state['trukket_aktivitet']}
                     </div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
-            if kat_v == "🍽️ Hva skal vi spise?":
-                if st.button(f"📅 Sett '{vinner_v}' som middag i dag ({idag_navn})", use_container_width=True):
-                    data["middagsplan"][idag_navn] = vinner_v
-                    st.session_state[f"rett_{idag_navn}"] = vinner_v
-                    lagre_naa()
-                    st.toast(f"Satt {vinner_v} på menyen for {idag_navn}!")
-                    st.rerun()
 
         st.write("---")
-        with st.expander("📝 Se og rediger familiens aktivitetsliste"):
+        with st.expander("📝 Se og rediger aktivitetslisten"):
             slett_akt = None
             for a_tekst in aktiviteter:
                 c_at, c_adel = st.columns([0.85, 0.15])
@@ -2589,7 +2353,7 @@ if "admin" in fane_map:
             mod_han = st.checkbox("🛒 Handleliste", value=moduler.get("handleliste", True), key="mod_chk_han")
             mod_pak = st.checkbox("🧳 Smart Pakkeliste", value=moduler.get("pakkeliste", True), key="mod_chk_pak")
             mod_gard = st.checkbox("👟 Garderobe & Klesstørrelser", value=moduler.get("garderobe", True), key="mod_chk_gard")
-            mod_akt = st.checkbox("🎡 Lykkehjul & Aktiviteter", value=moduler.get("aktiviteter", True), key="mod_chk_akt")
+            mod_akt = st.checkbox("🎲 Aktiviteter", value=moduler.get("aktiviteter", True), key="mod_chk_akt")
 
             if st.button("Lagre modulvalg 💾", use_container_width=True):
                 data["moduler"] = {
