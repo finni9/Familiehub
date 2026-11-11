@@ -192,23 +192,24 @@ def hent_profil(person, data_ref):
 
 st.set_page_config(page_title="Familiehub", page_icon="🏡", layout="centered")
 
-# ----------------- OPPGRADERT CSS (PILLE-FANER & KOMPAKT LAYOUT) -----------------
+# ----------------- KORRIGERT CSS (GOD PLASS ØVERST + PILLE-FANER) -----------------
 IKON_URL = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f3e1.png"
 
 skjul_streamlit_elementer = f"""
 <style>
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden; display: none;}}
+    header[data-testid="stHeader"] {{display: none !important;}}
     [data-testid="stToolbar"] {{visibility: hidden; display: none;}}
     [data-testid="stDecoration"] {{visibility: hidden; display: none;}}
     [data-testid="stStatusWidget"] {{visibility: hidden; display: none;}}
     [data-testid="manage-app-button"] {{display: none !important;}}
     div[class*="viewerBadge"] {{display: none !important;}}
     
-    /* Mindre tomrom øverst på mobil og desktop */
+    /* God plass i toppen slik at hele Familiehub-banneret synes */
     .block-container {{
-        padding-top: 1.2rem !important;
-        padding-bottom: 2.5rem !important;
+        padding-top: 1.5rem !important;
+        padding-bottom: 3rem !important;
     }}
 
     /* Stilrene Pille-faner (Tabs) */
@@ -516,7 +517,7 @@ if "aktiv_familie" not in st.session_state:
 if "aktiv_familie" not in st.session_state or not st.session_state["aktiv_familie"]:
     st.markdown(
         """
-        <div style="background-color: #1E293B; border-radius: 16px; padding: 26px; text-align: center; border: 2px solid #3B82F6; margin-top: 20px;">
+        <div style="background-color: #1E293B; border-radius: 16px; padding: 26px; text-align: center; border: 2px solid #3B82F6; margin-top: 10px;">
             <h1 style="color: #60A5FA; margin: 0; font-size: 1.9rem; font-weight: 900;">🏡 Familiehub</h1>
             <p style="color: #93C5FD; font-size: 1.05rem; margin-top: 6px; font-weight: 600;">Logg inn i familiens hjem med navn og PIN-kode</p>
         </div>
@@ -667,12 +668,28 @@ def legg_til_vare_i_data(varenavn, mengde="", kategori=None):
     })
     return True
 
+# CALLBACKS FOR LYNRASK AVKRYSNING UTEN Å HOPPE UT AV FANEN
+def cb_toggle_handleliste_vare(vare_id):
+    ny_verdi = st.session_state.get(f"hl_chk_{vare_id}", False)
+    for v in data["handleliste"]:
+        if v["id"] == vare_id:
+            v["kjopt"] = ny_verdi
+            break
+    lagre_naa()
+
+def cb_toggle_pakkeliste_vare(pakke_id):
+    ny_verdi = st.session_state.get(f"chk_p_{pakke_id}", False)
+    for p in data["pakkeliste"]:
+        if p["id"] == pakke_id:
+            p["pakket"] = ny_verdi
+            break
+    lagre_naa()
+
 def cb_sett_middag(dag, rett):
     data["middagsplan"][dag] = rett
     lagre_naa()
     st.session_state[f"rett_{dag}"] = rett
 
-# OPPGRADERT: FYLLER KUN TOMME DAGER
 def cb_auto_planlegg(oppskriftsliste):
     if not oppskriftsliste: return
     tomme_dager = [d for d in DAGER if not st.session_state.get(f"rett_{d}", "").strip()]
@@ -694,7 +711,6 @@ def cb_auto_planlegg(oppskriftsliste):
         st.session_state[f"rett_{dag}"] = ny_rett
     lagre_naa()
 
-# OPPGRADERT: FYLLER KUN TOMME DAGER FRA FRYSER
 def cb_planlegg_fra_fryser(oppskrifter, fryser_varer):
     if not oppskrifter:
         return
@@ -840,7 +856,7 @@ with col_banner:
     """
     st.markdown(banner_html, unsafe_allow_html=True)
 
-# ----------------- NYTT: «I DAG»-HURTIGKORT ØVERST -----------------
+# ----------------- «I DAG»-HURTIGKORT ØVERST -----------------
 dagens_middag_rett = data.get("middagsplan", {}).get(idag_navn, "").strip()
 middag_vis_tekst = f"<b>{dagens_middag_rett}</b>" if dagens_middag_rett else "<span style='color: #94A3B8;'>Ikke valgt enda</span>"
 
@@ -1084,19 +1100,16 @@ with st.expander(oppslag_tittel, expanded=False):
 
 er_forelder = st.session_state["foreldremodus"]
 
-# ----------------- DYNAMISKE FANER MED VARSEL-INDIKATOR -----------------
+# ----------------- STATISKE FANENAVN (FORHINDRER HOPPING MELLOM FANER) -----------------
 antall_venter_oppg = len([o for o in data.get("oppgaver", []) if o.get("status") == "venter"])
 oppg_fane_navn = f"⭐ Oppgaver (🔔 {antall_venter_oppg})" if antall_venter_oppg > 0 else "⭐ Oppgaver"
-
-antall_ukjopte_varer = len([v for v in data.get("handleliste", []) if not v.get("kjopt", False)])
-hl_fane_navn = f"🛒 Handleliste ({antall_ukjopte_varer})" if antall_ukjopte_varer > 0 else "🛒 Handleliste"
 
 faner_konfig = []
 if moduler.get("oppgaver", True): faner_konfig.append(("oppgaver", oppg_fane_navn))
 if moduler.get("butikk", True): faner_konfig.append(("butikk", "🎁 Butikk & Mål"))
 if moduler.get("statistikk", True): faner_konfig.append(("statistikk", "📊 Stjernelogg"))
 if moduler.get("middag", True): faner_konfig.append(("middag", "🍽️ Middag & Fryser"))
-if moduler.get("handleliste", True): faner_konfig.append(("handleliste", hl_fane_navn))
+if moduler.get("handleliste", True): faner_konfig.append(("handleliste", "🛒 Handleliste"))
 if moduler.get("pakkeliste", True): faner_konfig.append(("pakkeliste", "🧳 Pakkeliste"))
 if moduler.get("garderobe", True): faner_konfig.append(("garderobe", "👟 Garderobe"))
 if moduler.get("aktiviteter", True): faner_konfig.append(("aktiviteter", "🎲 Aktiviteter"))
@@ -1726,7 +1739,6 @@ if "statistikk" in fane_map:
 # ----------------- FANE: MIDDAG & FRYSER -----------------
 if "middag" in fane_map:
     with fane_map["middag"]:
-        # 1. FRYSER OG MATSKAP
         with st.expander("🧊 **Familiens Fryser & Matskap (Kutt matsvinn)**", expanded=False):
             fryser_data = data.get("fryser", [])
             varer_fryser = [v for v in fryser_data if v.get("plassering", "fryser") == "fryser"]
@@ -1789,7 +1801,6 @@ if "middag" in fane_map:
         oppskrifter = data.get("oppskrifter", STANDARD_MIDDAGER)
         oppskriftsliste = sorted(list(oppskrifter.keys()))
         
-        # 2. UKENS MIDDAGSPLAN
         st.markdown("#### 📅 Ukens Middagsplan")
         
         dag_rader = [
@@ -1867,7 +1878,6 @@ if "middag" in fane_map:
 
         st.write("")
 
-        # 3. FAMILIENS BILDEKOKEBOK
         with st.expander("📖 **Familiens Bildekokebok (Velg middag)**", expanded=False):
             slett_oppskrift = None
             oppskrift_nokler = sorted(list(oppskrifter.keys()))
@@ -1980,7 +1990,6 @@ if "middag" in fane_map:
                             st.toast(f"{ny_r.strip()} er lagt til!")
                             st.rerun()
 
-        # 4. HURTIGVERKTØY FLYTTET NEDERST (FYLLER KUN TOMME DAGER)
         with st.expander("🛠️ **Hurtigverktøy for ukemenyen (Fyll tomme dager & Felles innkjøp)**", expanded=False):
             st.caption("Knappene under lar dager du allerede har fylt ut stå i fred, og fyller kun inn de tomme dagene!")
             c_m1, c_m2 = st.columns(2)
@@ -2003,12 +2012,11 @@ if "middag" in fane_map:
             with c_m4:
                 st.button("🧹 Tøm hele ukemenyen", on_click=cb_tom_ukemeny, use_container_width=True)
 
-# ----------------- FANE: HANDLELISTE (MED BUTIKK-MODUS) -----------------
+# ----------------- FANE: HANDLELISTE (UTEN FANE-HOPPING) -----------------
 if "handleliste" in fane_map:
     with fane_map["handleliste"]:
         st.subheader("🛒 Handleliste")
 
-        # KOMPRIMERT MENY FOR HURTIGKNAPPER & NYE VARER (ÅPEN KUN HVIS LISTEN ER TOM)
         er_listen_tom = (len(data["handleliste"]) == 0)
         with st.expander("➕ **Legg til varer & Hurtigknapper**", expanded=er_listen_tom):
             basisvarer = data.get("basisvarer", STANDARD_BASISVARER)
@@ -2046,9 +2054,6 @@ if "handleliste" in fane_map:
                         st.toast(f"Lagt til {ny_v}!")
                         st.rerun()
 
-        # SELVE HANDLELISTEN LIGGER ØVERST FOR RASK AVKRYSNING I BUTIKKEN
-        handleliste_oppdatert = False
-
         if not data["handleliste"]:
             st.info("Handlelisten er helt tom! 🎉 Åpne boksen over for å legge til varer.")
         else:
@@ -2068,16 +2073,15 @@ if "handleliste" in fane_map:
                         mengde_tekst = f" `({v['mengde']})`" if v.get("mengde") else ""
                         visningstekst = f"~~{v['navn']}{mengde_tekst}~~" if er_kjopt else f"**{v['navn']}**{mengde_tekst}"
 
-                        ny_status = st.checkbox(visningstekst, value=er_kjopt, key=f"hl_chk_{v_id}")
-                        if ny_status != er_kjopt:
-                            v["kjopt"] = ny_status
-                            handleliste_oppdatert = True
+                        st.checkbox(
+                            visningstekst,
+                            value=er_kjopt,
+                            key=f"hl_chk_{v_id}",
+                            on_change=cb_toggle_handleliste_vare,
+                            args=(v_id,)
+                        )
 
                     st.write("")
-
-            if handleliste_oppdatert:
-                lagre_naa()
-                st.rerun()
 
             st.divider()
             c_hl1, c_hl2 = st.columns(2)
@@ -2093,7 +2097,7 @@ if "handleliste" in fane_map:
                     lagre_naa()
                     st.rerun()
 
-# ----------------- FANE: PAKKELISTE (MED KOMPRIMERTE SKJEMAER) -----------------
+# ----------------- FANE: PAKKELISTE -----------------
 if "pakkeliste" in fane_map:
     with fane_map["pakkeliste"]:
         st.subheader("🧳 Smart Pakkeliste for tur & utflukter")
@@ -2141,7 +2145,6 @@ if "pakkeliste" in fane_map:
                     st.rerun()
 
         grupper = ["Felles"] + [m for m in medlemmer if m != "Felles"]
-        pakkeliste_oppdatert = False
         slett_pakk_id = None
 
         if not pakkeliste:
@@ -2174,17 +2177,16 @@ if "pakkeliste" in fane_map:
                             col_chk, col_slett = st.columns([0.88, 0.12])
                             with col_chk:
                                 etikett = f"~~{itm['ikon']} {itm['tekst']}~~" if er_p else f"**{itm['ikon']} {itm['tekst']}**"
-                                ny_status = st.checkbox(etikett, value=er_p, key=f"chk_p_{itm_id}")
-                                if ny_status != er_p:
-                                    itm["pakket"] = ny_status
-                                    pakkeliste_oppdatert = True
+                                st.checkbox(
+                                    etikett,
+                                    value=er_p,
+                                    key=f"chk_p_{itm_id}",
+                                    on_change=cb_toggle_pakkeliste_vare,
+                                    args=(itm_id,)
+                                )
                             with col_slett:
                                 if st.button("✕", key=f"del_p_{itm_id}", help="Fjern fra pakkelisten"):
                                     slett_pakk_id = itm_id
-
-            if pakkeliste_oppdatert:
-                lagre_naa()
-                st.rerun()
 
             if slett_pakk_id:
                 data["pakkeliste"] = [x for x in data["pakkeliste"] if x["id"] != slett_pakk_id]
@@ -2229,7 +2231,6 @@ if "garderobe" in fane_map:
                     "mangler": "Ekstra ullsokker, regnvotter"
                 })
 
-                # Stilrent visningskort øverst for hvert barn
                 mangler_str = b_info.get("mangler", "").strip()
                 mangler_html = f"<div style='margin-top: 6px; font-size: 0.85rem; color: #FCD34D;'>🎒 <b>Mangler i kurven:</b> {mangler_str}</div>" if mangler_str else "<div style='margin-top: 6px; font-size: 0.85rem; color: #34D399;'>✅ Alt er på plass i kurven!</div>"
 
